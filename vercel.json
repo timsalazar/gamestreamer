@@ -1,8 +1,8 @@
 {
   "buildCommand": "echo 'No build needed'",
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/public/$1" }
+  "public": "public",
+  "redirects": [
+    { "source": "/", "destination": "/index.html" }
   ],
   "headers": [
     {
