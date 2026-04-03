@@ -30,9 +30,12 @@ export default async function handler(req, res) {
     // 2. Call Claude to parse the play
     let structuredPlay;
     try {
-      structuredPlay = await parsePlay(raw_input, game);
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Claude API timeout')), 25000)
+      );
+      structuredPlay = await Promise.race([parsePlay(raw_input, game), timeoutPromise]);
     } catch (err) {
-      return res.status(422).json({
+      return res.status(503).json({
         error: 'Could not parse that play. Try rephrasing.',
         detail: err.message,
       });
