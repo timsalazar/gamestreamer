@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GameStreamer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #f1f5f9;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 24px;
+    }
+
+    .logo {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-size: 22px; font-weight: 800;
+      letter-spacing: -.02em;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      font-size: 14px; color: #64748b;
+      margin-bottom: 40px;
+      text-align: center;
+    }
+
+    .cards {
+      display: flex; flex-direction: column; gap: 12px;
+      width: 100%; max-width: 360px;
+    }
+
+    .card {
+      background: #1e293b;
+      border-radius: 14px;
+      padding: 20px;
+      display: flex; align-items: center; gap: 16px;
+      text-decoration: none; color: inherit;
+      border: 1px solid #1e293b;
+      transition: background .15s, border-color .15s, transform .1s;
+      cursor: pointer;
+    }
+    .card:hover {
+      background: #273549;
+      border-color: #334155;
+      transform: translateY(-1px);
+    }
+    .card:active { transform: translateY(0); }
+
+    .card-icon {
+      width: 48px; height: 48px; border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; flex-shrink: 0;
+    }
+    .icon-scorer  { background: #172554; }
+    .icon-streamer { background: #1c1917; }
+    .icon-viewer  { background: #162032; }
+
+    .card-body { flex: 1; min-width: 0; }
+    .card-title {
+      font-size: 16px; font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .card-desc {
+      font-size: 13px; color: #64748b;
+      line-height: 1.4;
+    }
+
+    .card-arrow {
+      color: #334155; font-size: 18px; flex-shrink: 0;
+    }
+
+    .scorer-title  { color: #60a5fa; }
+    .streamer-title { color: #f87171; }
+    .viewer-title  { color: #a78bfa; }
+  </style>
+</head>
+<body>
+
+  <div class="logo">⚾</div>
+  <h1>GameStreamer</h1>
+  <p class="subtitle">Youth baseball live scoring &amp; streaming</p>
+
+  <div class="cards">
+
+    <a href="scorer.html" class="card">
+      <div class="card-icon icon-scorer">📋</div>
+      <div class="card-body">
+        <div class="card-title scorer-title">Scorer</div>
+        <div class="card-desc">Keep score at the field using plain-English play input</div>
+      </div>
+      <div class="card-arrow">›</div>
+    </a>
+
+    <a href="streamer.html" class="card">
+      <div class="card-icon icon-streamer">📡</div>
+      <div class="card-body">
+        <div class="card-title streamer-title">Streamer</div>
+        <div class="card-desc">Live box score overlay for your broadcast</div>
+      </div>
+      <div class="card-arrow">›</div>
+    </a>
+
+    <a href="viewer.html" class="card">
+      <div class="card-icon icon-viewer">📺</div>
+      <div class="card-body">
+        <div class="card-title viewer-title">Viewer</div>
+        <div class="card-desc">Watch the game live with real-time score updates</div>
+      </div>
+      <div class="card-arrow">›</div>
+    </a>
+
+  </div>
+
+</body>
+</html>

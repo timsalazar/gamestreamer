@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Streamer — GameStreamer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #f1f5f9;
+      min-height: 100vh; padding: 16px;
+      max-width: 600px; margin: 0 auto;
+    }
+
+    .nav { margin-bottom: 20px; }
+    .nav a {
+      color: #60a5fa; font-size: 13px; text-decoration: none;
+      background: #1e293b; padding: 6px 12px; border-radius: 8px;
+    }
+    .nav a:hover { background: #334155; }
+
+    h1 { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
+    .subtitle { font-size: 14px; color: #64748b; margin-bottom: 28px; }
+
+    /* Section header */
+    .section-label {
+      font-size: 11px; color: #64748b; text-transform: uppercase;
+      letter-spacing: .1em; font-weight: 600; margin-bottom: 10px;
+    }
+
+    /* Set stream URL card */
+    .card {
+      background: #1e293b; border-radius: 14px; padding: 20px;
+      margin-bottom: 20px;
+    }
+    .card-title {
+      font-size: 15px; font-weight: 700; margin-bottom: 4px;
+    }
+    .card-desc {
+      font-size: 13px; color: #64748b; margin-bottom: 16px; line-height: 1.5;
+    }
+
+    label { font-size: 12px; color: #94a3b8; display: block; margin-bottom: 6px; font-weight: 600; }
+    input[type="text"] {
+      width: 100%; background: #0f172a; border: 1px solid #334155;
+      border-radius: 8px; padding: 10px 12px; color: #f1f5f9;
+      font-size: 14px; margin-bottom: 12px; outline: none;
+      transition: border-color .15s;
+    }
+    input[type="text"]:focus { border-color: #3b82f6; }
+    input[type="text"]::placeholder { color: #475569; }
+
+    .btn {
+      background: #f87171; color: #fff; border: none; border-radius: 10px;
+      padding: 11px 20px; font-size: 14px; font-weight: 700;
+      cursor: pointer; width: 100%; transition: background .15s;
+    }
+    .btn:hover { background: #ef4444; }
+    .btn:disabled { background: #334155; color: #64748b; cursor: default; }
+
+    .msg {
+      margin-top: 12px; font-size: 13px; border-radius: 8px;
+      padding: 10px 12px; display: none;
+    }
+    .msg.ok    { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+    .msg.error { background: #1c0c0c; color: #f87171; border: 1px solid #7f1d1d; }
+
+    /* Platform cards */
+    .platform { background: #1e293b; border-radius: 14px; padding: 20px; margin-bottom: 12px; }
+    .platform-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+    }
+    .platform-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; flex-shrink: 0;
+    }
+    .icon-yt { background: #1c0000; }
+    .icon-tw { background: #13001f; }
+    .icon-obs { background: #00101e; }
+
+    .platform-name { font-size: 15px; font-weight: 700; }
+    .platform-url-format {
+      font-size: 11px; color: #64748b; font-family: monospace;
+      background: #0f172a; padding: 2px 6px; border-radius: 4px;
+      display: inline-block; margin-top: 2px;
+    }
+
+    ol { padding-left: 18px; }
+    ol li {
+      font-size: 13px; color: #cbd5e1; margin-bottom: 8px; line-height: 1.5;
+    }
+    ol li:last-child { margin-bottom: 0; }
+
+    code {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      background: #0f172a; color: #a78bfa;
+      padding: 1px 5px; border-radius: 4px; font-size: 12px;
+    }
+
+    .tip {
+      background: #0f172a; border-left: 3px solid #3b82f6;
+      padding: 10px 14px; border-radius: 0 8px 8px 0;
+      font-size: 13px; color: #94a3b8; margin-top: 12px; line-height: 1.5;
+    }
+    .tip strong { color: #e2e8f0; }
+  </style>
+</head>
+<body>
+
+  <div class="nav"><a href="/">← Home</a></div>
+
+  <h1>📡 Streamer Setup</h1>
+  <p class="subtitle">How to broadcast your game and link it to GameStreamer</p>
+
+  <!-- Set stream URL -->
+  <div class="section-label">Connect your stream</div>
+  <div class="card">
+    <div class="card-title">Add stream URL to a game</div>
+    <div class="card-desc">
+      Once you go live on YouTube, Twitch, or any HLS source, paste the URL below.
+      Viewers will see your video alongside the live score.
+    </div>
+
+    <label for="game-id">Game ID</label>
+    <input type="text" id="game-id" placeholder="e.g. abc123" />
+
+    <label for="stream-url">Stream URL</label>
+    <input type="text" id="stream-url" placeholder="https://youtube.com/live/..." />
+
+    <button class="btn" id="save-btn" onclick="saveStream()">Save Stream URL</button>
+    <div class="msg" id="msg"></div>
+
+    <!-- Viewer link buttons (shown after save) -->
+    <div id="viewer-share" style="display:none; margin-top:16px;">
+      <div style="font-size:11px;color:#4ade80;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:8px;">
+        📺 Share Viewer Link
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="openViewer()" style="
+          flex:1; min-width:100px; background:#16a34a; color:white; border:none;
+          border-radius:8px; padding:10px 14px; font-size:13px; font-weight:600;
+          cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
+        ">🖥️ Open Viewer</button>
+        <button onclick="copyViewerUrl()" id="copy-btn" style="
+          flex:1; min-width:100px; background:#1e3a2f; color:#4ade80; border:1px solid #16a34a;
+          border-radius:8px; padding:10px 14px; font-size:13px; font-weight:600;
+          cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
+        ">🔗 Copy Link</button>
+        <button onclick="shareViewerUrl()" style="
+          flex:1; min-width:100px; background:#1e3a2f; color:#4ade80; border:1px solid #16a34a;
+          border-radius:8px; padding:10px 14px; font-size:13px; font-weight:600;
+          cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
+        ">📤 Share</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Platform instructions -->
+  <div class="section-label">How to go live</div>
+
+  <!-- YouTube -->
+  <div class="platform">
+    <div class="platform-header">
+      <div class="platform-icon icon-yt">▶️</div>
+      <div>
+        <div class="platform-name">YouTube Live</div>
+        <div class="platform-url-format">youtube.com/live/VIDEO_ID</div>
+      </div>
+    </div>
+    <ol>
+      <li>Open <strong>YouTube Studio</strong> and click <strong>Go Live</strong> in the top-right corner.</li>
+      <li>Choose <strong>Stream</strong> (for OBS) or <strong>Webcam</strong> for a quick browser-based broadcast.</li>
+      <li>Set your title and click <strong>Go Live</strong>. YouTube will give you a live URL like <code>youtube.com/live/AbCdEfG1234</code>.</li>
+      <li>Copy that URL and paste it into the field above.</li>
+    </ol>
+    <div class="tip">
+      <strong>OBS users:</strong> In YouTube Studio, copy the <strong>Stream key</strong> and paste it into OBS under Settings → Stream → YouTube RTMPS.
+    </div>
+  </div>
+
+  <!-- Twitch -->
+  <div class="platform">
+    <div class="platform-header">
+      <div class="platform-icon icon-tw">🟣</div>
+      <div>
+        <div class="platform-name">Twitch</div>
+        <div class="platform-url-format">twitch.tv/your_channel</div>
+      </div>
+    </div>
+    <ol>
+      <li>Open <strong>OBS Studio</strong> (or Streamlabs) on your laptop or phone.</li>
+      <li>Go to <strong>Settings → Stream</strong>, choose <strong>Twitch</strong>, and connect your account.</li>
+      <li>Click <strong>Start Streaming</strong> in OBS.</li>
+      <li>Your stream URL is simply <code>twitch.tv/your_channel_name</code> — paste that above.</li>
+    </ol>
+    <div class="tip">
+      <strong>No account yet?</strong> Sign up free at twitch.tv. Your channel URL is available immediately.
+    </div>
+  </div>
+
+  <!-- OBS / HLS -->
+  <div class="platform">
+    <div class="platform-header">
+      <div class="platform-icon icon-obs">📹</div>
+      <div>
+        <div class="platform-name">OBS / Custom HLS</div>
+        <div class="platform-url-format">https://your-server.com/stream.m3u8</div>
+      </div>
+    </div>
+    <ol>
+      <li>In <strong>OBS Studio</strong>, go to <strong>Settings → Output → Recording</strong> and set the format to <strong>HLS</strong>.</li>
+      <li>Or use a self-hosted media server (e.g. <strong>nginx-rtmp</strong>, <strong>SRS</strong>, or <strong>MediaMTX</strong>) and point OBS at it via RTMP.</li>
+      <li>The server will produce an <code>.m3u8</code> playlist URL — something like <code>https://yourserver.com/live/game.m3u8</code>.</li>
+      <li>Paste that <code>.m3u8</code> URL into the stream URL field above.</li>
+    </ol>
+    <div class="tip">
+      <strong>Quick local option:</strong> Run <code>mediamtx</code> on your laptop and push with OBS via RTMP. It outputs an HLS URL accessible on your local network.
+    </div>
+  </div>
+
+  <script>
+    // Pre-fill game ID from URL if present
+    const params = new URLSearchParams(location.search);
+    if (params.get('game')) {
+      document.getElementById('game-id').value = params.get('game');
+    }
+
+    async function saveStream() {
+      const gameId = document.getElementById('game-id').value.trim();
+      const streamUrl = document.getElementById('stream-url').value.trim();
+      const msg = document.getElementById('msg');
+      const btn = document.getElementById('save-btn');
+
+      msg.style.display = 'none';
+
+      if (!gameId) return showMsg('error', 'Enter a game ID.');
+      if (!streamUrl) return showMsg('error', 'Enter a stream URL.');
+
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+
+      try {
+        const res = await fetch(`/api/game/${encodeURIComponent(gameId)}/state`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stream_url: streamUrl }),
+        });
+
+        if (res.status === 404) return showMsg('error', 'Game not found. Check your game ID.');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        showMsg('ok', 'Stream URL saved! Viewers will see your video when they open the game.');
+        document.getElementById('viewer-share').style.display = 'block';
+      } catch (err) {
+        showMsg('error', `Failed to save: ${err.message}`);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Stream URL';
+      }
+    }
+
+    function getViewerUrl() {
+      const gameId = document.getElementById('game-id').value.trim();
+      return `${location.origin}/viewer.html?game=${gameId}`;
+    }
+
+    function openViewer() {
+      window.open(getViewerUrl(), '_blank');
+    }
+
+    function copyViewerUrl() {
+      navigator.clipboard.writeText(getViewerUrl()).then(() => {
+        const btn = document.getElementById('copy-btn');
+        btn.innerHTML = '✅ Copied!';
+        setTimeout(() => btn.innerHTML = '🔗 Copy Link', 2000);
+      });
+    }
+
+    async function shareViewerUrl() {
+      const url = getViewerUrl();
+      const shareData = { title: 'Watch the game live!', text: 'Follow the game live on GameStreamer:', url };
+
+      if (navigator.share) {
+        try { await navigator.share(shareData); return; }
+        catch (e) { if (e.name === 'AbortError') return; }
+      }
+
+      document.getElementById('share-mail-link').href =
+        `mailto:?subject=${encodeURIComponent(shareData.title)}&body=${encodeURIComponent(shareData.text + '\n' + url)}`;
+      document.getElementById('share-sms-link').href =
+        `sms:?body=${encodeURIComponent(shareData.text + ' ' + url)}`;
+      document.getElementById('share-overlay').style.display = 'flex';
+    }
+
+    function closeShareOverlay() {
+      document.getElementById('share-overlay').style.display = 'none';
+    }
+
+    function showMsg(type, text) {
+      const msg = document.getElementById('msg');
+      msg.className = `msg ${type}`;
+      msg.textContent = text;
+      msg.style.display = 'block';
+    }
+  </script>
+
+<!-- Share overlay (desktop fallback) -->
+<div id="share-overlay" onclick="if(event.target===this)closeShareOverlay()" style="
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7);
+  z-index:1000; align-items:center; justify-content:center;
+">
+  <div style="
+    background:#1a1a2e; border:1px solid #16a34a; border-radius:16px;
+    padding:24px; width:300px; max-width:90vw;
+  ">
+    <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px;">Share Viewer Link</div>
+    <div style="font-size:12px;color:#4ade80;margin-bottom:20px;">Send to friends &amp; family</div>
+    <a id="share-mail-link" href="#" style="
+      display:flex; align-items:center; gap:12px;
+      background:#1e3a2f; border:1px solid #166534; border-radius:10px;
+      padding:14px 16px; color:#fff; text-decoration:none;
+      font-size:14px; font-weight:600; margin-bottom:10px;
+    ">
+      <span style="font-size:22px;">✉️</span>
+      <div>
+        <div>Send via Email</div>
+        <div style="font-size:11px;color:#4ade80;font-weight:400;">Opens your mail app</div>
+      </div>
+    </a>
+    <a id="share-sms-link" href="#" style="
+      display:flex; align-items:center; gap:12px;
+      background:#1e3a2f; border:1px solid #166534; border-radius:10px;
+      padding:14px 16px; color:#fff; text-decoration:none;
+      font-size:14px; font-weight:600; margin-bottom:20px;
+    ">
+      <span style="font-size:22px;">💬</span>
+      <div>
+        <div>Send via Text</div>
+        <div style="font-size:11px;color:#4ade80;font-weight:400;">Opens your messages app</div>
+      </div>
+    </a>
+    <button onclick="closeShareOverlay()" style="
+      width:100%; background:transparent; border:1px solid #374151;
+      color:#9ca3af; border-radius:8px; padding:10px;
+      font-size:13px; cursor:pointer;
+    ">Cancel</button>
+  </div>
+</div>
+
+</body>
+</html>

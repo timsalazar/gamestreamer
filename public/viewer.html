@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Watch Game — GameStreamer</title>
+  <!-- hls.js loaded lazily only if needed -->
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #f1f5f9; min-height: 100vh;
+    }
+
+    /* Video */
+    .video-wrap { width: 100%; background: #000; position: relative; }
+    .video-wrap iframe, .video-wrap video { width: 100%; aspect-ratio: 16/9; display: block; }
+    .no-stream { aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; color: #475569; font-size: 14px; }
+
+    /* ── Scoreboard rows ── */
+    .scoreboard { background: #1e293b; }
+    .score-row {
+      display: flex; align-items: center;
+      padding: 0 12px; height: 44px; gap: 10px;
+    }
+    .score-row:first-child { border-bottom: 1px solid #0f172a; }
+    .score-row-label {
+      font-size: 11px; font-weight: 800; color: #fff;
+      text-transform: uppercase; letter-spacing: .04em;
+      min-width: 36px;
+    }
+    .score-row-name {
+      flex: 1; font-size: 13px; font-weight: 700; color: #e2e8f0;
+      text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .score-row-runs {
+      font-size: 26px; font-weight: 900; min-width: 28px; text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    .away-runs { color: #60a5fa; }
+    .home-runs { color: #f87171; }
+
+    /* ── Broadcast scorebug bar ── */
+    .scorebug {
+      background: #0f172a; border-top: 1px solid #1e293b;
+      display: flex; align-items: center;
+      padding: 8px 12px; gap: 0;
+    }
+
+    /* Inning block */
+    .sb-inning {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; min-width: 44px; gap: 1px;
+    }
+    .sb-inning-arrow { font-size: 10px; color: #64748b; line-height: 1; }
+    .sb-inning-arrow.active { color: #e2e8f0; }
+    .sb-inning-num { font-size: 22px; font-weight: 900; color: #e2e8f0; line-height: 1; font-variant-numeric: tabular-nums; }
+
+    .sb-divider { width: 1px; background: #1e293b; margin: 0 10px; align-self: stretch; }
+
+    /* Diamond */
+    .sb-diamond-wrap { position: relative; width: 52px; height: 52px; flex-shrink: 0; }
+    .sb-base {
+      width: 14px; height: 14px; border-radius: 2px; position: absolute;
+      transform: rotate(45deg); background: #1e293b; border: 1.5px solid #334155;
+      transition: background .25s, border-color .25s;
+    }
+    .sb-base.on  { background: #f59e0b; border-color: #fbbf24; }
+    .sb-base.second { top: 2px;   left: 50%; transform: translateX(-50%) rotate(45deg); }
+    .sb-base.third  { top: 50%;   left: 2px; transform: translateY(-50%) rotate(45deg); }
+    .sb-base.first  { top: 50%;   right: 2px; transform: translateY(-50%) rotate(45deg); }
+    .sb-base.home   { bottom: 2px; left: 50%; transform: translateX(-50%) rotate(45deg); background: #0f172a; border-color: #334155; }
+
+    /* Outs */
+    .sb-outs-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-left: 6px; }
+    .sb-outs-label { font-size: 9px; color: #475569; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+    .sb-outs-dots { display: flex; flex-direction: column; gap: 3px; }
+    .sb-out { width: 9px; height: 9px; border-radius: 50%; background: #1e293b; border: 1.5px solid #334155; transition: background .25s; }
+    .sb-out.on { background: #f59e0b; border-color: #fbbf24; }
+
+    .sb-divider { width: 1px; background: #1e293b; margin: 0 10px; align-self: stretch; min-height: 36px; }
+
+    /* Count */
+    .sb-count-wrap { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    .sb-count-label { font-size: 9px; color: #475569; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+    .sb-count-rows  { display: flex; flex-direction: column; gap: 3px; }
+    .sb-count-row   { display: flex; align-items: center; gap: 4px; }
+    .sb-count-letter { font-size: 9px; font-weight: 700; min-width: 8px; }
+    .sb-count-letter.b { color: #4ade80; }
+    .sb-count-letter.s { color: #f87171; }
+    .sb-pip {
+      width: 9px; height: 9px; border-radius: 50%;
+      border: 1.5px solid #334155; background: #1e293b; transition: background .2s;
+    }
+    .sb-pip.b.on { background: #4ade80; border-color: #4ade80; }
+    .sb-pip.s.on { background: #f87171; border-color: #f87171; }
+
+    /* Spacer + live badge */
+    .sb-spacer { flex: 1; }
+    .sb-status { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700; text-transform: uppercase; }
+    .sb-status.live  { color: #ef4444; }
+    .sb-status.other { color: #475569; }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #ef4444; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+
+    /* Play feed */
+    .play-feed { padding: 16px; }
+    .feed-title { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 12px; font-weight: 600; }
+    .play-item { padding: 10px 0; border-bottom: 1px solid #1e293b; display: flex; gap: 10px; }
+    .play-item:last-child { border-bottom: none; }
+    .play-type-badge {
+      flex-shrink: 0; display: inline-block; background: #1e3a5f; color: #60a5fa;
+      border-radius: 4px; padding: 2px 7px; font-size: 10px; font-weight: 700;
+      text-transform: uppercase; height: fit-content; margin-top: 1px;
+    }
+    .play-text { font-size: 14px; color: #cbd5e1; }
+    .play-score { font-size: 11px; color: #475569; margin-top: 2px; }
+
+    .no-plays { color: #475569; font-size: 14px; padding: 20px 0; text-align: center; }
+    .connecting { text-align: center; padding: 40px 16px; color: #475569; }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div class="connecting">Connecting to game…</div>
+</div>
+
+<script>
+  const gameId = new URLSearchParams(location.search).get('game');
+  let gameState = null;
+  let lastPlayId = null;
+  let hlsLoaded = false;
+  let pollTimer = null;
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  async function init() {
+    if (!gameId) {
+      document.getElementById('app').innerHTML =
+        '<div class="connecting">No game ID in URL — add <code>?game=GAMEID</code></div>';
+      return;
+    }
+
+    document.getElementById('app').innerHTML =
+      '<div class="connecting">Loading game…</div>';
+
+    const ok = await fetchState();
+    if (!ok) return; // error already displayed
+
+    renderAll();
+    startPolling();
+  }
+
+  // ── Fetch /api/game/:id/state ─────────────────────────────────────────────
+  async function fetchState() {
+    try {
+      const res = await fetch(`/api/game/${gameId}/state`);
+      if (res.status === 404) {
+        document.getElementById('app').innerHTML =
+          `<div class="connecting">Game <strong>${esc(gameId)}</strong> not found.</div>`;
+        return false;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      const isFirstLoad = !gameState;
+      const latestPlayId = data.recent_plays?.[0]?.id ?? null;
+      const hasNewPlay = latestPlayId !== lastPlayId;
+
+      gameState = data;
+      lastPlayId = latestPlayId;
+
+      if (!isFirstLoad) {
+        // Incremental update — only re-render what changed
+        renderScoreboard();
+        renderScorebug(); // always sync count (balls/strikes) from server state
+        if (hasNewPlay) renderPlayLog();
+      }
+      return true;
+    } catch (err) {
+      console.error('Poll error:', err);
+      return gameState != null; // keep showing stale data if we had any
+    }
+  }
+
+  function startPolling() {
+    // Poll every 3 seconds while game is live, every 10 when final
+    const interval = () => (gameState?.status === 'final' ? 10000 : 3000);
+    const tick = async () => {
+      await fetchState();
+      pollTimer = setTimeout(tick, interval());
+    };
+    pollTimer = setTimeout(tick, interval());
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  function renderAll() {
+    document.getElementById('app').innerHTML = `
+      <div class="video-wrap" id="video-wrap"></div>
+      <div class="scoreboard" id="scoreboard"></div>
+      <div class="scorebug" id="scorebug"></div>
+      <div class="play-feed">
+        <div class="feed-title">Play by Play</div>
+        <div id="play-log"></div>
+      </div>
+    `;
+    renderVideo();
+    renderScoreboard();
+    renderScorebug();
+    renderPlayLog();
+  }
+
+  function renderVideo() {
+    const wrap = document.getElementById('video-wrap');
+    const url = gameState.stream_url;
+    if (!url) {
+      wrap.innerHTML = '<div class="no-stream">📺 Stream not yet started</div>';
+      return;
+    }
+
+    // YouTube
+    const yt = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/))([a-zA-Z0-9_-]{11})/);
+    if (yt) {
+      wrap.innerHTML = `<iframe src="https://www.youtube.com/embed/${yt[1]}?autoplay=1&mute=1"
+        allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+      return;
+    }
+
+    // Twitch — twitch.tv/username
+    const tw = url.match(/twitch\.tv\/([a-zA-Z0-9_]+)/);
+    if (tw) {
+      const parent = location.hostname || 'localhost';
+      wrap.innerHTML = `<iframe src="https://player.twitch.tv/?channel=${tw[1]}&parent=${parent}&autoplay=true&muted=true"
+        allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+      return;
+    }
+
+    // HLS — load hls.js lazily then attach
+    if (url.includes('.m3u8')) {
+      wrap.innerHTML = '<video id="hls-video" controls autoplay muted playsinline></video>';
+      const video = document.getElementById('hls-video');
+      loadHls().then(() => {
+        if (window.Hls?.isSupported()) {
+          const hls = new window.Hls();
+          hls.loadSource(url);
+          hls.attachMedia(video);
+        } else {
+          video.src = url; // Safari native HLS
+        }
+      });
+      return;
+    }
+
+    wrap.innerHTML = `<iframe src="${esc(url)}" allowfullscreen></iframe>`;
+  }
+
+  function loadHls() {
+    if (hlsLoaded) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
+      s.onload = () => { hlsLoaded = true; resolve(); };
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  function renderScoreboard() {
+    const g = gameState;
+    document.getElementById('scoreboard').innerHTML = `
+      <div class="score-row">
+        <div class="score-row-label" style="color:#93c5fd;">Away</div>
+        <div class="score-row-name">${esc(g.away_team)}</div>
+        <div class="score-row-runs away-runs">${g.away_score}</div>
+      </div>
+      <div class="score-row">
+        <div class="score-row-label" style="color:#fca5a5;">Home</div>
+        <div class="score-row-name">${esc(g.home_team)}</div>
+        <div class="score-row-runs home-runs">${g.home_score}</div>
+      </div>
+    `;
+  }
+
+  function renderScorebug() {
+    const g  = gameState;
+    const r  = g.runners ?? {};
+    const balls   = g.balls   ?? 0;
+    const strikes = g.strikes ?? 0;
+    const outs    = g.outs    ?? 0;
+    const isLive  = g.status === 'live';
+
+    // Inning half arrows
+    const upArrow   = `<div class="sb-inning-arrow${g.half === 'top'    ? ' active' : ''}">▲</div>`;
+    const downArrow = `<div class="sb-inning-arrow${g.half === 'bottom' ? ' active' : ''}">▼</div>`;
+
+    // Base pips (4 balls, 3 strikes, 2 outs shown as rows of dots)
+    const ballPips   = [0,1,2,3].map(i =>
+      `<div class="sb-pip b${i < balls   ? ' on' : ''}"></div>`).join('');
+    const strikePips = [0,1,2].map(i =>
+      `<div class="sb-pip s${i < strikes ? ' on' : ''}"></div>`).join('');
+    const outPips    = [0,1,2].map(i =>
+      `<div class="sb-out${i < outs ? ' on' : ''}"></div>`).join('');
+
+    const statusHtml = isLive
+      ? `<div class="sb-status live"><div class="live-dot"></div>Live</div>`
+      : `<div class="sb-status other">${g.status === 'final' ? 'Final' : 'Pre-game'}</div>`;
+
+    document.getElementById('scorebug').innerHTML = `
+      <!-- Inning -->
+      <div class="sb-inning">
+        ${upArrow}
+        <div class="sb-inning-num">${g.inning ?? 1}</div>
+        ${downArrow}
+      </div>
+
+      <div class="sb-divider"></div>
+
+      <!-- Diamond + outs -->
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div class="sb-diamond-wrap">
+          <div class="sb-base second${r.second ? ' on' : ''}"></div>
+          <div class="sb-base third${r.third   ? ' on' : ''}"></div>
+          <div class="sb-base first${r.first   ? ' on' : ''}"></div>
+          <div class="sb-base home"></div>
+        </div>
+        <div class="sb-outs-wrap">
+          <div class="sb-outs-label">Out</div>
+          <div class="sb-outs-dots">${outPips}</div>
+        </div>
+      </div>
+
+      <div class="sb-divider"></div>
+
+      <!-- Count -->
+      <div class="sb-count-wrap">
+        <div class="sb-count-label">Count</div>
+        <div class="sb-count-rows">
+          <div class="sb-count-row">
+            <span class="sb-count-letter b">B</span>${ballPips}
+          </div>
+          <div class="sb-count-row">
+            <span class="sb-count-letter s">S</span>${strikePips}
+          </div>
+        </div>
+      </div>
+
+      <div class="sb-spacer"></div>
+      ${statusHtml}
+    `;
+  }
+
+  function renderPlayLog() {
+    const plays = gameState.recent_plays ?? [];
+    document.getElementById('play-log').innerHTML = plays.length
+      ? plays.map(playHtml).join('')
+      : '<div class="no-plays">Waiting for first play…</div>';
+  }
+
+  function playHtml(p) {
+    const type = p.structured_play?.play_type ?? '';
+    const score = p.score_after
+      ? `${p.score_after.away ?? 0}–${p.score_after.home ?? 0}` : '';
+    return `<div class="play-item">
+      <span class="play-type-badge">${esc(type)}</span>
+      <div>
+        <div class="play-text">${esc(p.raw_input)}</div>
+        ${score ? `<div class="play-score">${score}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  function ordinal(inning, half) {
+    const s = [,'st','nd','rd'][inning] ?? 'th';
+    return `${half === 'top' ? '▲' : '▼'} ${inning}${s}`;
+  }
+
+  function esc(s = '') {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  init();
+</script>
+</body>
+</html>

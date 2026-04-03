@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "GameStreamer",
+    "slug": "gamestreamer",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "gamestreamer",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#0f172a",
+    "splash": {
+      "backgroundColor": "#0f172a",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.gamestreamer.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used for live streaming"
+      }
+    },
+    "android": {
+      "package": "com.gamestreamer.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-video"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

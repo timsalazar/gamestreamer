@@ -1,0 +1,24 @@
+{
+  "name": "kids-sports-app",
+  "version": "1.0.0",
+  "description": "Youth baseball live scoring and streaming app",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env server.js",
+    "dev": "nodemon --env-file=.env server.js",
+    "deploy": "vercel --prod",
+    "test": "node --experimental-test-module-mocks --test tests/*.test.js",
+    "test:watch": "node --experimental-test-module-mocks --test --watch tests/*.test.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@supabase/supabase-js": "^2.47.0",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "connect-livereload": "^0.6.1",
+    "livereload": "^0.10.3",
+    "nodemon": "^3.1.14",
+    "vercel": "^39.0.0"
+  }
+}

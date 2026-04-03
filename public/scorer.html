@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Scorer — GameStreamer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #f1f5f9;
+      min-height: 100vh; padding: 16px;
+    }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .header h1 { font-size: 18px; font-weight: 700; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #22c55e; display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }
+
+    /* Scoreboard */
+    .scoreboard {
+      background: #1e293b; border-radius: 12px; padding: 16px;
+      display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px;
+      align-items: center; margin-bottom: 16px; text-align: center;
+    }
+    .team-name { font-size: 13px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
+    .team-score { font-size: 52px; font-weight: 800; line-height: 1; }
+    .away-score { color: #60a5fa; }
+    .home-score { color: #f87171; }
+    .inning-block { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .inning-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .1em; }
+    .inning-val { font-size: 22px; font-weight: 700; }
+    .separator { color: #475569; font-size: 36px; font-weight: 300; }
+
+    /* Outs + Bases */
+    .field-row { display: flex; gap: 12px; margin-bottom: 16px; }
+    .outs-block, .bases-block {
+      background: #1e293b; border-radius: 12px; padding: 12px 16px; flex: 1;
+    }
+    .block-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 8px; }
+    .outs-dots { display: flex; gap: 8px; }
+    .out-dot { width: 14px; height: 14px; border-radius: 50%; background: #334155; border: 2px solid #475569; transition: background .2s; }
+    .out-dot.active { background: #f59e0b; border-color: #f59e0b; }
+    .diamond { width: 72px; height: 72px; position: relative; margin: 0 auto; }
+    .base { width: 18px; height: 18px; border-radius: 3px; background: #334155; border: 2px solid #475569; position: absolute; transition: background .2s; transform: rotate(45deg); }
+    .base.occupied { background: #f59e0b; border-color: #fbbf24; }
+    .base.second  { top: 0;    left: 50%; transform: translateX(-50%) rotate(45deg); }
+    .base.third   { top: 50%; left: 0;   transform: translateY(-50%) rotate(45deg); }
+    .base.first   { top: 50%; right: 0;  transform: translateY(-50%) rotate(45deg); }
+    .base.home    { bottom: 0; left: 50%; transform: translateX(-50%) rotate(45deg); background: #1e3a5f; border-color: #3b82f6; }
+
+    /* Input area */
+    .input-section { background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .input-label { font-size: 12px; color: #64748b; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
+    textarea {
+      width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+      color: #f1f5f9; padding: 12px; font-size: 16px; resize: none; height: 80px;
+      font-family: inherit; outline: none; transition: border-color .2s;
+    }
+    textarea:focus { border-color: #3b82f6; }
+    .btn-row { display: flex; gap: 8px; margin-top: 10px; }
+    .btn-submit {
+      flex: 1; background: #3b82f6; color: white; border: none; border-radius: 10px;
+      padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background .2s;
+    }
+    .btn-submit:hover { background: #2563eb; }
+    .btn-submit:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+    .btn-undo {
+      background: #334155; color: #94a3b8; border: none; border-radius: 10px;
+      padding: 14px 16px; font-size: 16px; cursor: pointer; transition: background .2s;
+    }
+    .btn-undo:hover { background: #475569; }
+
+    /* Play log */
+    .log-section { background: #1e293b; border-radius: 12px; padding: 16px; }
+    .log-title { font-size: 13px; font-weight: 600; color: #64748b; margin-bottom: 12px; text-transform: uppercase; letter-spacing: .05em; }
+    .play-item { padding: 10px 0; border-bottom: 1px solid #1e293b; }
+    .play-item:last-child { border-bottom: none; }
+    .play-raw { font-size: 14px; color: #e2e8f0; }
+    .play-meta { font-size: 11px; color: #475569; margin-top: 2px; }
+    .play-type-badge {
+      display: inline-block; background: #1e3a5f; color: #60a5fa;
+      border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 600;
+      text-transform: uppercase; margin-right: 4px;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+      padding: 12px 20px; font-size: 14px; opacity: 0; transition: opacity .3s;
+      pointer-events: none; z-index: 100; max-width: 90vw; text-align: center;
+    }
+    .toast.show { opacity: 1; }
+    .toast.error { border-color: #ef4444; color: #fca5a5; }
+    .toast.success { border-color: #22c55e; color: #86efac; }
+
+    .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #334155; border-top-color: #3b82f6; border-radius: 50%; animation: spin .7s linear infinite; margin-right: 8px; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .game-select-screen { text-align: center; padding: 40px 16px; }
+    .game-select-screen h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+    .game-select-screen p { color: #64748b; margin-bottom: 24px; }
+    input[type=text] {
+      width: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 8px;
+      color: #f1f5f9; padding: 12px; font-size: 16px; outline: none; transition: border-color .2s; margin-bottom: 10px;
+    }
+    input[type=text]:focus { border-color: #3b82f6; }
+    .btn-create {
+      width: 100%; background: #22c55e; color: white; border: none; border-radius: 10px;
+      padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div id="setup-screen" class="game-select-screen">
+  <h2>⚾ New Game</h2>
+  <p>Enter the team names to start scoring</p>
+  <input type="text" id="away-team-input" placeholder="Away team name" />
+  <input type="text" id="home-team-input" placeholder="Home team name" />
+  <input type="text" id="stream-url-input" placeholder="YouTube stream URL (optional)" />
+  <button class="btn-create" onclick="createGame()">Start Game</button>
+</div>
+
+<div id="scorer-screen" style="display:none">
+  <div class="header">
+    <h1>⚾ <span id="game-title">Scoring</span></h1>
+    <span><span class="status-dot"></span><span id="status-label">Live</span></span>
+  </div>
+
+  <div class="scoreboard">
+    <div>
+      <div class="team-name" id="away-name">Away</div>
+      <div class="team-score away-score" id="away-score">0</div>
+    </div>
+    <div class="separator">–</div>
+    <div>
+      <div class="team-name" id="home-name">Home</div>
+      <div class="team-score home-score" id="home-score">0</div>
+    </div>
+  </div>
+
+  <div style="background:#1e293b;border-radius:12px;padding:10px 16px;text-align:center;margin-bottom:16px;">
+    <span id="inning-display" style="font-size:18px;font-weight:700;color:#e2e8f0">Top 1st</span>
+  </div>
+
+  <div class="field-row">
+    <div class="outs-block">
+      <div class="block-label">Outs</div>
+      <div class="outs-dots">
+        <div class="out-dot" id="out-0"></div>
+        <div class="out-dot" id="out-1"></div>
+        <div class="out-dot" id="out-2"></div>
+      </div>
+    </div>
+    <div class="bases-block">
+      <div class="block-label">Runners</div>
+      <div class="diamond">
+        <div class="base second" id="base-second"></div>
+        <div class="base third"  id="base-third"></div>
+        <div class="base first"  id="base-first"></div>
+        <div class="base home"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Balls & Strikes count -->
+  <div style="background:#1e293b;border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;gap:12px;align-items:stretch;">
+    <!-- Balls -->
+    <div style="flex:1;text-align:center;">
+      <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:600;">Balls</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
+        <button onclick="adjustCount('balls',-1)" style="width:36px;height:36px;border-radius:8px;background:#334155;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1;">−</button>
+        <span id="balls-display" style="font-size:32px;font-weight:800;color:#4ade80;min-width:28px;">0</span>
+        <button onclick="adjustCount('balls',1)"  style="width:36px;height:36px;border-radius:8px;background:#334155;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1;">+</button>
+      </div>
+      <div style="display:flex;gap:5px;justify-content:center;margin-top:8px;" id="ball-dots"></div>
+    </div>
+    <!-- Divider -->
+    <div style="width:1px;background:#334155;"></div>
+    <!-- Strikes -->
+    <div style="flex:1;text-align:center;">
+      <div style="font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:600;">Strikes</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;">
+        <button onclick="adjustCount('strikes',-1)" style="width:36px;height:36px;border-radius:8px;background:#334155;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1;">−</button>
+        <span id="strikes-display" style="font-size:32px;font-weight:800;color:#f87171;min-width:28px;">0</span>
+        <button onclick="adjustCount('strikes',1)"  style="width:36px;height:36px;border-radius:8px;background:#334155;border:none;color:#94a3b8;font-size:20px;cursor:pointer;line-height:1;">+</button>
+      </div>
+      <div style="display:flex;gap:5px;justify-content:center;margin-top:8px;" id="strike-dots"></div>
+    </div>
+  </div>
+
+  <div class="input-section">
+    <div class="input-label">
+      <span>Describe the play</span>
+    </div>
+    <textarea id="play-input" placeholder='e.g. "Johnny singled, runner on second scored"' rows="3"></textarea>
+    <div class="btn-row">
+      <button class="btn-submit" id="submit-btn" onclick="submitPlay()">Submit Play</button>
+      <button class="btn-undo" onclick="undoPlay()" title="Undo last play">↩</button>
+    </div>
+  </div>
+
+  <!-- Persistent share banner -->
+  <div id="share-banner" style="
+    background:#0d2a1f; border:1px solid #16a34a; border-radius:12px;
+    padding:12px 16px; margin-bottom:16px; display:none;
+  ">
+    <div style="font-size:11px;color:#4ade80;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-bottom:8px;">
+      📺 Viewer Link
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button onclick="openViewer()" style="
+        flex:1; min-width:100px; background:#16a34a; color:white; border:none;
+        border-radius:8px; padding:10px 14px; font-size:13px; font-weight:600;
+        cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
+      ">🖥️ Open Viewer</button>
+      <button onclick="copyViewerUrl()" id="copy-btn" style="
+        flex:1; min-width:100px; background:#1e3a2f; color:#4ade80; border:1px solid #16a34a;
+        border-radius:8px; padding:10px 14px; font-size:13px; font-weight:600;
+        cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
+      ">🔗 Copy Link</button>
+      <button onclick="shareViewerUrl()" style="
+        flex:1; min-width:100px; background:#1e3a2f; color:#4ade80; border:1px solid #16a34a;
+        border-radius:8px; padding:10px 14px; font-size:13px; font-weight:600;
+        cursor:pointer; display:flex; align-items:center; justify-content:center; gap:6px;
+      ">📤 Share</button>
+    </div>
+    <div style="font-size:11px;color:#4ade80;margin-top:8px;">
+      Game ID: <strong id="game-id-display" style="font-family:monospace;"></strong>
+    </div>
+  </div>
+
+  <div class="log-section">
+    <div class="log-title">Recent Plays</div>
+    <div id="play-log"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- Share overlay (desktop fallback) -->
+<div id="share-overlay" onclick="if(event.target===this)closeShareOverlay()" style="
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7);
+  z-index:1000; align-items:center; justify-content:center;
+">
+  <div style="
+    background:#1a1a2e; border:1px solid #16a34a; border-radius:16px;
+    padding:24px; width:300px; max-width:90vw;
+  ">
+    <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:4px;">Share Viewer Link</div>
+    <div style="font-size:12px;color:#4ade80;margin-bottom:20px;">Send to friends &amp; family</div>
+    <a id="share-mail-link" href="#" style="
+      display:flex; align-items:center; gap:12px;
+      background:#1e3a2f; border:1px solid #166534; border-radius:10px;
+      padding:14px 16px; color:#fff; text-decoration:none;
+      font-size:14px; font-weight:600; margin-bottom:10px;
+    ">
+      <span style="font-size:22px;">✉️</span>
+      <div>
+        <div>Send via Email</div>
+        <div style="font-size:11px;color:#4ade80;font-weight:400;">Opens your mail app</div>
+      </div>
+    </a>
+    <a id="share-sms-link" href="#" style="
+      display:flex; align-items:center; gap:12px;
+      background:#1e3a2f; border:1px solid #166534; border-radius:10px;
+      padding:14px 16px; color:#fff; text-decoration:none;
+      font-size:14px; font-weight:600; margin-bottom:20px;
+    ">
+      <span style="font-size:22px;">💬</span>
+      <div>
+        <div>Send via Text</div>
+        <div style="font-size:11px;color:#4ade80;font-weight:400;">Opens your messages app</div>
+      </div>
+    </a>
+    <button onclick="closeShareOverlay()" style="
+      width:100%; background:transparent; border:1px solid #374151;
+      color:#9ca3af; border-radius:8px; padding:10px;
+      font-size:13px; cursor:pointer;
+    ">Cancel</button>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://izddxiligsqzbnorcwlf.supabase.co';
+  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6ZGR4aWxpZ3NxemJub3Jjd2xmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTY2NTcsImV4cCI6MjA5MDM5MjY1N30.NMb5P8Iaxdc4TpuNhXbGwMyP7reL2ruvdlh-MUNJTdk';
+
+  let gameId = null;
+  let gameState = null;
+
+  // ---------- Setup ----------
+  async function createGame() {
+    const away = document.getElementById('away-team-input').value.trim();
+    const home = document.getElementById('home-team-input').value.trim();
+    const streamUrl = document.getElementById('stream-url-input').value.trim();
+    if (!away || !home) return showToast('Enter both team names', 'error');
+
+    const res = await fetch('/api/games', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ away_team: away, home_team: home, stream_url: streamUrl || null }),
+    });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.error, 'error');
+
+    gameId = data.id;
+    gameState = data;
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('scorer-screen').style.display = 'block';
+    updateUI();
+    showShareBanner();
+  }
+
+  function showShareBanner() {
+    document.getElementById('game-id-display').textContent = gameId;
+    document.getElementById('share-banner').style.display = 'block';
+  }
+
+  function getViewerUrl() {
+    return `${location.origin}/viewer.html?game=${gameId}`;
+  }
+
+  function openViewer() {
+    window.open(getViewerUrl(), '_blank');
+  }
+
+  function copyViewerUrl() {
+    navigator.clipboard.writeText(getViewerUrl()).then(() => {
+      const btn = document.getElementById('copy-btn');
+      btn.innerHTML = '✅ Copied!';
+      setTimeout(() => btn.innerHTML = '🔗 Copy Link', 2000);
+    });
+  }
+
+  async function shareViewerUrl() {
+    const url = getViewerUrl();
+    const shareData = { title: 'Watch the game live!', text: 'Follow the game live on GameStreamer:', url };
+
+    if (navigator.share) {
+      try { await navigator.share(shareData); return; }
+      catch (e) { if (e.name === 'AbortError') return; }
+    }
+
+    // Desktop fallback: show overlay with email + SMS options
+    document.getElementById('share-mail-link').href =
+      `mailto:?subject=${encodeURIComponent(shareData.title)}&body=${encodeURIComponent(shareData.text + '\n' + url)}`;
+    document.getElementById('share-sms-link').href =
+      `sms:?body=${encodeURIComponent(shareData.text + ' ' + url)}`;
+    document.getElementById('share-overlay').style.display = 'flex';
+  }
+
+  function closeShareOverlay() {
+    document.getElementById('share-overlay').style.display = 'none';
+  }
+  }
+
+  // ---------- Submit Play ----------
+  async function submitPlay() {
+    const input = document.getElementById('play-input').value.trim();
+    if (!input) return;
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading"></span>Parsing…';
+
+    try {
+      const res = await fetch(`/api/game/${gameId}/play`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw_input: input }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showToast(data.error, 'error');
+
+      gameState = data.game;
+      document.getElementById('play-input').value = '';
+      updateUI();
+      prependPlay({ raw_input: input, structured_play: data.play });
+      showToast('Play recorded ✓', 'success');
+    } catch (e) {
+      showToast('Network error — try again', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Submit Play';
+    }
+  }
+
+  // ---------- Undo ----------
+  async function undoPlay() {
+    if (!confirm('Undo last play?')) return;
+    const res = await fetch(`/api/game/${gameId}/play`, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.error, 'error');
+    // Re-fetch game state
+    const stateRes = await fetch(`/api/game/${gameId}/state`);
+    gameState = await stateRes.json();
+    updateUI();
+    showToast('Last play undone', 'success');
+  }
+
+  // ---------- UI ----------
+  function updateUI() {
+    if (!gameState) return;
+    document.getElementById('away-name').textContent = gameState.away_team;
+    document.getElementById('home-name').textContent = gameState.home_team;
+    document.getElementById('game-title').textContent = `${gameState.away_team} @ ${gameState.home_team}`;
+    document.getElementById('away-score').textContent = gameState.away_score;
+    document.getElementById('home-score').textContent = gameState.home_score;
+    document.getElementById('inning-display').textContent = ordinalInning(gameState.inning, gameState.half);
+
+    // Outs
+    for (let i = 0; i < 3; i++) {
+      document.getElementById(`out-${i}`).classList.toggle('active', i < gameState.outs);
+    }
+    // Count
+    renderCount();
+    // Runners
+    const r = gameState.runners;
+    document.getElementById('base-first').classList.toggle('occupied', !!r.first);
+    document.getElementById('base-second').classList.toggle('occupied', !!r.second);
+    document.getElementById('base-third').classList.toggle('occupied', !!r.third);
+
+    // Recent plays
+    if (gameState.recent_plays?.length) {
+      document.getElementById('play-log').innerHTML = gameState.recent_plays.map(playHtml).join('');
+    }
+  }
+
+  function prependPlay(play) {
+    const log = document.getElementById('play-log');
+    log.insertAdjacentHTML('afterbegin', playHtml(play));
+  }
+
+  function playHtml(p) {
+    const type = p.structured_play?.play_type ?? '';
+    return `<div class="play-item">
+      <div class="play-raw"><span class="play-type-badge">${type}</span>${escHtml(p.raw_input)}</div>
+    </div>`;
+  }
+
+  function ordinalInning(inning, half) {
+    const s = [,'st','nd','rd'][inning] ?? 'th';
+    return `${half === 'top' ? '▲' : '▼'} ${inning}${s}`;
+  }
+
+  // ---------- Count ----------
+  async function adjustCount(field, delta) {
+    if (!gameId) return;
+    const current = gameState?.[field] ?? 0;
+    const next = Math.max(0, Math.min(field === 'balls' ? 3 : 2, current + delta));
+    // Optimistic update
+    gameState[field] = next;
+    renderCount();
+    // Persist
+    await fetch(`/api/game/${gameId}/count`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [field]: next }),
+    });
+  }
+
+  function renderCount() {
+    const balls   = gameState?.balls   ?? 0;
+    const strikes = gameState?.strikes ?? 0;
+    document.getElementById('balls-display').textContent   = balls;
+    document.getElementById('strikes-display').textContent = strikes;
+    // Dot indicators
+    document.getElementById('ball-dots').innerHTML =
+      [0,1,2,3].map(i => `<div style="width:10px;height:10px;border-radius:50%;background:${i<balls?'#4ade80':'#334155'};border:1.5px solid ${i<balls?'#4ade80':'#475569'};"></div>`).join('');
+    document.getElementById('strike-dots').innerHTML =
+      [0,1,2].map(i => `<div style="width:10px;height:10px;border-radius:50%;background:${i<strikes?'#f87171':'#334155'};border:1.5px solid ${i<strikes?'#f87171':'#475569'};"></div>`).join('');
+  }
+
+  // ---------- Voice ----------
+
+  // ---------- Keyboard ----------
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitPlay();
+  });
+
+  // ---------- Toast ----------
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast show ${type}`;
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Enter to submit
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('play-input')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitPlay(); }
+    });
+  });
+</script>
+</body>
+</html>
