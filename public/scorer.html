@@ -293,6 +293,34 @@
     </div>
   </div>
 
+  <!-- Lineup panel -->
+  <div id="lineup-panel" style="display:none; background:#1e293b; border-radius:12px; padding:14px 16px; margin-bottom:16px;">
+    <div style="font-size:11px; color:#64748b; text-transform:uppercase; letter-spacing:.08em; font-weight:600; margin-bottom:10px;">
+      At Bat — <span id="lineup-half-label">Top</span> of <span id="lineup-inning-label">1st</span>
+    </div>
+
+    <!-- Current batter highlight -->
+    <div id="current-batter-card" style="background:#1e3a5f; border:1px solid #3b82f6; border-radius:10px; padding:12px 14px; margin-bottom:10px; display:flex; align-items:center; gap:12px;">
+      <div style="font-size:28px; font-weight:800; color:#60a5fa; min-width:32px; text-align:center;" id="batter-order">1</div>
+      <div>
+        <div style="font-size:17px; font-weight:700; color:#f1f5f9;" id="batter-name">-</div>
+        <div style="font-size:12px; color:#94a3b8;" id="batter-position">-</div>
+      </div>
+      <div style="margin-left:auto; font-size:13px; color:#475569;" id="batter-number"></div>
+    </div>
+
+    <!-- On-deck batter -->
+    <div style="font-size:11px; color:#475569; margin-bottom:6px;">On Deck</div>
+    <div style="background:#0f172a; border-radius:8px; padding:8px 12px; display:flex; align-items:center; gap:10px;" id="ondeck-card">
+      <div style="font-size:16px; font-weight:700; color:#475569;" id="ondeck-order">2</div>
+      <div style="font-size:14px; color:#64748b;" id="ondeck-name">-</div>
+      <div style="font-size:11px; color:#334155; margin-left:auto;" id="ondeck-position">-</div>
+    </div>
+
+    <!-- Mini order strip: shows all 9 -->
+    <div id="batting-order-strip" style="display:flex; gap:4px; margin-top:10px; flex-wrap:wrap;"></div>
+  </div>
+
   <div class="input-section">
     <div class="input-label">
       <span>Describe the play</span>
@@ -672,6 +700,7 @@
       document.getElementById('setup-screen').style.display = 'none';
       document.getElementById('scorer-screen').style.display = 'block';
       updateUI();
+      await loadLineup();
       showShareBanner();
     } catch (e) {
       showToast('Error starting game', 'error');
@@ -764,6 +793,14 @@
       document.getElementById('play-input').value = '';
       updateUI();
       prependPlay({ raw_input: input, structured_play: data.play });
+
+      // Advance batting order if play completed (not ball or strike)
+      const completedPA = !['ball', 'strike'].includes(data.play.play_type);
+      if (completedPA && lineupState) {
+        const battingSide = gameState.half === 'top' ? 'away' : 'home';
+        await advanceBatter(battingSide);
+      }
+
       showToast('Play recorded ✓', 'success');
     } catch (e) {
       showToast('Network error — try again', 'error');
@@ -783,6 +820,7 @@
     const stateRes = await fetch(`/api/game/${gameId}/state`);
     gameState = await stateRes.json();
     updateUI();
+    await loadLineup();
     showToast('Last play undone', 'success');
   }
 
@@ -811,6 +849,95 @@
     // Recent plays
     if (gameState.recent_plays?.length) {
       document.getElementById('play-log').innerHTML = gameState.recent_plays.map(playHtml).join('');
+    }
+
+    // Lineup panel
+    updateLineupPanel();
+  }
+
+  async function loadLineup() {
+    if (!gameId) return;
+    try {
+      const res = await fetch(`/api/game/${gameId}/lineup`);
+      if (res.ok) {
+        lineupState = await res.json();
+        updateLineupPanel();
+      }
+    } catch (e) {
+      console.error('Failed to load lineup:', e);
+    }
+  }
+
+  function updateLineupPanel() {
+    if (!lineupState) return;
+
+    const battingSide = gameState.half === 'top' ? 'away' : 'home';
+    const lineup = lineupState[battingSide];
+
+    if (!lineup || !lineup.players || lineup.players.length === 0) {
+      document.getElementById('lineup-panel').style.display = 'none';
+      return;
+    }
+
+    document.getElementById('lineup-panel').style.display = 'block';
+    document.getElementById('lineup-half-label').textContent = gameState.half === 'top' ? 'Top' : 'Bottom';
+    document.getElementById('lineup-inning-label').textContent = ordinalInning(gameState.inning, '').split(' ')[1];
+
+    const players = lineup.players.sort((a, b) => (a.batting_order || 0) - (b.batting_order || 0));
+    const currentIdx = lineup.current_batter_index % players.length;
+    const currentBatter = players[currentIdx];
+    const nextIdx = (currentIdx + 1) % players.length;
+    const nextBatter = players[nextIdx];
+
+    // Current batter card
+    if (currentBatter) {
+      document.getElementById('batter-order').textContent = currentBatter.batting_order || '';
+      document.getElementById('batter-name').textContent = currentBatter.name || '-';
+      document.getElementById('batter-position').textContent = currentBatter.position || '-';
+      document.getElementById('batter-number').textContent = currentBatter.number ? `#${currentBatter.number}` : '';
+    }
+
+    // On-deck
+    if (nextBatter) {
+      document.getElementById('ondeck-order').textContent = nextBatter.batting_order || '';
+      document.getElementById('ondeck-name').textContent = nextBatter.name || '-';
+      document.getElementById('ondeck-position').textContent = nextBatter.position || '-';
+    }
+
+    // Batting order strip
+    const strip = document.getElementById('batting-order-strip');
+    strip.innerHTML = players.map((p, idx) => `
+      <div style="width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; background:${idx === currentIdx ? '#3b82f6' : '#334155'}; color:${idx === currentIdx ? '#fff' : '#94a3b8'};">
+        ${p.batting_order || ''}
+      </div>
+    `).join('');
+
+    // Update textarea placeholder
+    if (currentBatter && currentBatter.name) {
+      document.getElementById('play-input').placeholder = `e.g. "${currentBatter.name} singled to left"`;
+    }
+  }
+
+  async function advanceBatter(side) {
+    if (!gameId || !lineupState) return;
+    const lineup = lineupState[side];
+    if (!lineup) return;
+
+    const nextIdx = (lineup.current_batter_index + 1) % (lineup.players?.length || 9);
+
+    try {
+      const res = await fetch(`/api/game/${gameId}/lineup`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ side, current_batter_index: nextIdx })
+      });
+
+      if (res.ok) {
+        lineupState[side] = await res.json();
+        updateLineupPanel();
+      }
+    } catch (e) {
+      console.error('Failed to advance batter:', e);
     }
   }
 
