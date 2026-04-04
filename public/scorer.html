@@ -100,26 +100,129 @@
     .game-select-screen { text-align: center; padding: 40px 16px; }
     .game-select-screen h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
     .game-select-screen p { color: #64748b; margin-bottom: 24px; }
-    input[type=text] {
+    input[type=text], input[type=file], select {
       width: 100%; background: #1e293b; border: 1px solid #334155; border-radius: 8px;
       color: #f1f5f9; padding: 12px; font-size: 16px; outline: none; transition: border-color .2s; margin-bottom: 10px;
     }
-    input[type=text]:focus { border-color: #3b82f6; }
+    input[type=text]:focus, input[type=file]:focus, select:focus { border-color: #3b82f6; }
+    select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 12px center; background-size: 20px; padding-right: 40px; }
     .btn-create {
       width: 100%; background: #22c55e; color: white; border: none; border-radius: 10px;
-      padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer;
+      padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background .2s;
     }
+    .btn-create:hover { background: #16a34a; }
+    .btn-next { width: 100%; background: #3b82f6; color: white; border: none; border-radius: 10px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background .2s; }
+    .btn-next:hover { background: #2563eb; }
+    .btn-skip { width: 100%; background: #475569; color: #94a3b8; border: none; border-radius: 10px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px; }
+    .setup-step { display: none; }
+    .setup-step.active { display: block; }
+    .lineup-editor { margin: 20px 0; text-align: left; background: #0f172a; border-radius: 12px; padding: 16px; }
+    .lineup-editor h3 { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #e2e8f0; }
+    .lineup-rows { display: flex; flex-direction: column; gap: 10px; }
+    .lineup-row { display: grid; grid-template-columns: 40px 1fr 80px 60px; gap: 8px; align-items: center; }
+    .lineup-row input, .lineup-row select { padding: 8px; font-size: 13px; }
+    .btn-add-batter { background: #334155; color: #94a3b8; border: 1px solid #475569; padding: 8px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+    .btn-scan { background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; margin-left: 8px; }
+    input[type=file] { display: none; }
+    .summary-card { background: #1e293b; border-radius: 12px; padding: 16px; margin-bottom: 16px; text-align: left; }
+    .summary-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #334155; }
+    .summary-row:last-child { border-bottom: none; }
+    .summary-label { color: #94a3b8; font-size: 14px; }
+    .summary-value { color: #f1f5f9; font-size: 14px; font-weight: 600; }
   </style>
 </head>
 <body>
 
 <div id="setup-screen" class="game-select-screen">
-  <h2>⚾ New Game</h2>
-  <p>Enter the team names to start scoring</p>
-  <input type="text" id="away-team-input" placeholder="Away team name" />
-  <input type="text" id="home-team-input" placeholder="Home team name" />
-  <input type="text" id="stream-url-input" placeholder="YouTube stream URL (optional)" />
-  <button class="btn-create" onclick="createGame()">Start Game</button>
+  <!-- Step 1: Team Selection -->
+  <div id="step-1" class="setup-step active">
+    <h2>⚾ New Game</h2>
+    <p>Select or create teams</p>
+
+    <div style="text-align: left; margin-bottom: 20px;">
+      <label style="display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; font-weight: 600;">Away Team</label>
+      <select id="away-team-select" onchange="onAwayTeamChange()" style="margin-bottom: 10px;">
+        <option value="">-- Select or Create --</option>
+      </select>
+      <input type="text" id="away-team-name" placeholder="Team name (or create new)" />
+      <input type="hidden" id="away-team-id" />
+    </div>
+
+    <div style="text-align: left; margin-bottom: 20px;">
+      <label style="display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; text-transform: uppercase; font-weight: 600;">Home Team</label>
+      <select id="home-team-select" onchange="onHomeTeamChange()" style="margin-bottom: 10px;">
+        <option value="">-- Select or Create --</option>
+      </select>
+      <input type="text" id="home-team-name" placeholder="Team name (or create new)" />
+      <input type="hidden" id="home-team-id" />
+    </div>
+
+    <button class="btn-next" onclick="goToStep(2)">Next: Set Lineups →</button>
+  </div>
+
+  <!-- Step 2: Lineup Editor -->
+  <div id="step-2" class="setup-step">
+    <h2>⚾ Set Lineups</h2>
+    <p>Add player lineups (optional)</p>
+
+    <!-- Away Lineup -->
+    <div class="lineup-editor">
+      <h3 id="away-lineup-title">Away Team Lineup</h3>
+      <div class="lineup-rows" id="away-lineup-rows"></div>
+      <div style="margin-top: 10px; display: flex; gap: 8px;">
+        <button class="btn-add-batter" onclick="addBatterRow('away')">+ Add Batter</button>
+        <button class="btn-scan" onclick="triggerScan('away')">📷 Scan Card</button>
+      </div>
+      <input type="file" id="away-lineup-file" accept="image/*" onchange="handleLineupScan(event, 'away')" />
+    </div>
+
+    <!-- Home Lineup -->
+    <div class="lineup-editor">
+      <h3 id="home-lineup-title">Home Team Lineup</h3>
+      <div class="lineup-rows" id="home-lineup-rows"></div>
+      <div style="margin-top: 10px; display: flex; gap: 8px;">
+        <button class="btn-add-batter" onclick="addBatterRow('home')">+ Add Batter</button>
+        <button class="btn-scan" onclick="triggerScan('home')">📷 Scan Card</button>
+      </div>
+      <input type="file" id="home-lineup-file" accept="image/*" onchange="handleLineupScan(event, 'home')" />
+    </div>
+
+    <button class="btn-next" onclick="goToStep(3)">Next: Confirm →</button>
+    <button class="btn-skip" onclick="goToStep(3)">Skip Lineups</button>
+  </div>
+
+  <!-- Step 3: Confirm & Start -->
+  <div id="step-3" class="setup-step">
+    <h2>⚾ Start Game</h2>
+    <p>Review and confirm</p>
+
+    <div class="summary-card">
+      <div class="summary-row">
+        <span class="summary-label">Away Team</span>
+        <span class="summary-value" id="summary-away-name">-</span>
+      </div>
+      <div class="summary-row">
+        <span class="summary-label">Away Lineup</span>
+        <span class="summary-value" id="summary-away-lineup">Not set</span>
+      </div>
+      <div class="summary-row">
+        <span class="summary-label">Home Team</span>
+        <span class="summary-value" id="summary-home-name">-</span>
+      </div>
+      <div class="summary-row">
+        <span class="summary-label">Home Lineup</span>
+        <span class="summary-value" id="summary-home-lineup">Not set</span>
+      </div>
+    </div>
+
+    <div style="text-align: left; margin-bottom: 16px;">
+      <label style="display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px;">Stream URL (optional)</label>
+      <input type="text" id="stream-url-input" placeholder="YouTube stream URL" />
+    </div>
+
+    <button class="btn-create" onclick="startGame()" style="margin-bottom: 10px;">Start Game</button>
+    <button class="btn-skip" onclick="goToStep(2)">← Back</button>
+  </div>
 </div>
 
 <div id="scorer-screen" style="display:none">
@@ -288,8 +391,294 @@
 
   let gameId = null;
   let gameState = null;
+  let lineupState = null;
 
-  // ---------- Setup ----------
+  // Setup flow state
+  let setupStep = 1;
+  let allTeams = [];
+  let awayTeamId = null;
+  let homeTeamId = null;
+  let pendingAwayPlayers = [];
+  let pendingHomePlayers = [];
+
+  // ---------- Setup: Load Teams & Initialize ----------
+  async function initSetupScreen() {
+    await loadTeams();
+    renderLineupRows('away');
+    renderLineupRows('home');
+  }
+
+  async function loadTeams() {
+    try {
+      const res = await fetch('/api/teams');
+      if (!res.ok) return;
+      allTeams = await res.json();
+      populateTeamSelects();
+    } catch (e) {
+      console.error('Failed to load teams:', e);
+    }
+  }
+
+  function populateTeamSelects() {
+    const awaySelect = document.getElementById('away-team-select');
+    const homeSelect = document.getElementById('home-team-select');
+
+    // Clear and rebuild
+    awaySelect.innerHTML = '<option value="">-- New Team --</option>';
+    homeSelect.innerHTML = '<option value="">-- New Team --</option>';
+
+    allTeams.forEach(team => {
+      const opt1 = document.createElement('option');
+      opt1.value = team.id;
+      opt1.textContent = team.name;
+      awaySelect.appendChild(opt1);
+
+      const opt2 = document.createElement('option');
+      opt2.value = team.id;
+      opt2.textContent = team.name;
+      homeSelect.appendChild(opt2);
+    });
+  }
+
+  function onAwayTeamChange() {
+    const select = document.getElementById('away-team-select');
+    const nameInput = document.getElementById('away-team-name');
+
+    if (select.value) {
+      // Existing team selected
+      const team = allTeams.find(t => t.id === select.value);
+      if (team) {
+        nameInput.value = team.name;
+        awayTeamId = team.id;
+        pendingAwayPlayers = JSON.parse(JSON.stringify(team.players || []));
+      }
+    } else {
+      // New team
+      nameInput.value = '';
+      awayTeamId = null;
+      pendingAwayPlayers = [];
+    }
+    renderLineupRows('away');
+  }
+
+  function onHomeTeamChange() {
+    const select = document.getElementById('home-team-select');
+    const nameInput = document.getElementById('home-team-name');
+
+    if (select.value) {
+      // Existing team selected
+      const team = allTeams.find(t => t.id === select.value);
+      if (team) {
+        nameInput.value = team.name;
+        homeTeamId = team.id;
+        pendingHomePlayers = JSON.parse(JSON.stringify(team.players || []));
+      }
+    } else {
+      // New team
+      nameInput.value = '';
+      homeTeamId = null;
+      pendingHomePlayers = [];
+    }
+    renderLineupRows('home');
+  }
+
+  function goToStep(n) {
+    document.querySelectorAll('.setup-step').forEach(el => el.classList.remove('active'));
+    document.getElementById(`step-${n}`).classList.add('active');
+    setupStep = n;
+
+    if (n === 3) updateSummary();
+  }
+
+  function renderLineupRows(side) {
+    const container = document.getElementById(`${side}-lineup-rows`);
+    const players = side === 'away' ? pendingAwayPlayers : pendingHomePlayers;
+
+    container.innerHTML = players
+      .sort((a, b) => (a.batting_order || 0) - (b.batting_order || 0))
+      .map((p, idx) => `
+        <div class="lineup-row">
+          <input type="number" min="1" max="9" value="${p.batting_order || idx + 1}"
+            onchange="updateBatterOrder('${side}', ${idx}, this.value)">
+          <input type="text" placeholder="Player name" value="${p.name || ''}"
+            onchange="updateBatterName('${side}', ${idx}, this.value)">
+          <select onchange="updateBatterPosition('${side}', ${idx}, this.value)">
+            <option value="">Pos</option>
+            <option ${p.position === 'P' ? 'selected' : ''}>P</option>
+            <option ${p.position === 'C' ? 'selected' : ''}>C</option>
+            <option ${p.position === '1B' ? 'selected' : ''}>1B</option>
+            <option ${p.position === '2B' ? 'selected' : ''}>2B</option>
+            <option ${p.position === '3B' ? 'selected' : ''}>3B</option>
+            <option ${p.position === 'SS' ? 'selected' : ''}>SS</option>
+            <option ${p.position === 'LF' ? 'selected' : ''}>LF</option>
+            <option ${p.position === 'CF' ? 'selected' : ''}>CF</option>
+            <option ${p.position === 'RF' ? 'selected' : ''}>RF</option>
+            <option ${p.position === 'DH' ? 'selected' : ''}>DH</option>
+          </select>
+          <input type="text" placeholder="#" value="${p.number || ''}"
+            onchange="updateBatterNumber('${side}', ${idx}, this.value)" style="text-align: center;">
+        </div>
+      `).join('');
+  }
+
+  function updateBatterOrder(side, idx, val) {
+    const arr = side === 'away' ? pendingAwayPlayers : pendingHomePlayers;
+    arr[idx].batting_order = parseInt(val) || idx + 1;
+  }
+
+  function updateBatterName(side, idx, val) {
+    const arr = side === 'away' ? pendingAwayPlayers : pendingHomePlayers;
+    arr[idx].name = val;
+  }
+
+  function updateBatterPosition(side, idx, val) {
+    const arr = side === 'away' ? pendingAwayPlayers : pendingHomePlayers;
+    arr[idx].position = val;
+  }
+
+  function updateBatterNumber(side, idx, val) {
+    const arr = side === 'away' ? pendingAwayPlayers : pendingHomePlayers;
+    arr[idx].number = val || null;
+  }
+
+  function addBatterRow(side) {
+    const arr = side === 'away' ? pendingAwayPlayers : pendingHomePlayers;
+    const nextOrder = (arr.length ? Math.max(...arr.map(p => p.batting_order || 0)) : 0) + 1;
+    arr.push({ batting_order: nextOrder, name: '', position: '', number: null });
+    renderLineupRows(side);
+  }
+
+  function triggerScan(side) {
+    document.getElementById(`${side}-lineup-file`).click();
+  }
+
+  async function handleLineupScan(event, side) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64 = e.target.result.split(',')[1];
+      const mediaType = file.type || 'image/jpeg';
+
+      try {
+        showToast('Scanning lineup card...', '');
+        const res = await fetch('/api/lineup/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_base64: base64, media_type: mediaType })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showToast(`Scan failed: ${data.error}`, 'error');
+          return;
+        }
+
+        // Replace players with scanned result
+        const arr = side === 'away' ? pendingAwayPlayers : pendingHomePlayers;
+        if (data.players && Array.isArray(data.players)) {
+          if (side === 'away') pendingAwayPlayers = data.players;
+          else pendingHomePlayers = data.players;
+          renderLineupRows(side);
+          showToast(`Scanned ${data.players.length} players ✓`, 'success');
+        }
+      } catch (e) {
+        showToast('Network error — try again', 'error');
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function updateSummary() {
+    const awayName = document.getElementById('away-team-name').value || 'Away Team';
+    const homeName = document.getElementById('home-team-name').value || 'Home Team';
+
+    document.getElementById('summary-away-name').textContent = awayName;
+    document.getElementById('summary-home-name').textContent = homeName;
+    document.getElementById('summary-away-lineup').textContent = pendingAwayPlayers.length > 0 ? `${pendingAwayPlayers.length} players` : 'Not set';
+    document.getElementById('summary-home-lineup').textContent = pendingHomePlayers.length > 0 ? `${pendingHomePlayers.length} players` : 'Not set';
+  }
+
+  async function startGame() {
+    const awayName = document.getElementById('away-team-name').value.trim();
+    const homeName = document.getElementById('home-team-name').value.trim();
+    const streamUrl = document.getElementById('stream-url-input').value.trim();
+
+    if (!awayName || !homeName) {
+      showToast('Enter both team names', 'error');
+      return;
+    }
+
+    try {
+      // 1. Create game
+      const gameRes = await fetch('/api/games', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ away_team: awayName, home_team: homeName, stream_url: streamUrl || null })
+      });
+      const gameData = await gameRes.json();
+      if (!gameRes.ok) {
+        showToast(gameData.error, 'error');
+        return;
+      }
+
+      gameId = gameData.id;
+      gameState = gameData;
+
+      // 2. Save or create away team if needed
+      let finalAwayTeamId = awayTeamId;
+      if (!awayTeamId && awayName) {
+        const teamRes = await fetch('/api/teams', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: awayName, players: pendingAwayPlayers })
+        });
+        const teamData = await teamRes.json();
+        if (teamRes.ok) finalAwayTeamId = teamData.id;
+      }
+
+      // 3. Save or create home team if needed
+      let finalHomeTeamId = homeTeamId;
+      if (!homeTeamId && homeName) {
+        const teamRes = await fetch('/api/teams', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: homeName, players: pendingHomePlayers })
+        });
+        const teamData = await teamRes.json();
+        if (teamRes.ok) finalHomeTeamId = teamData.id;
+      }
+
+      // 4. Save lineups for the game
+      if (pendingAwayPlayers.length > 0) {
+        await fetch(`/api/game/${gameId}/lineup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ side: 'away', team_id: finalAwayTeamId, players: pendingAwayPlayers })
+        });
+      }
+
+      if (pendingHomePlayers.length > 0) {
+        await fetch(`/api/game/${gameId}/lineup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ side: 'home', team_id: finalHomeTeamId, players: pendingHomePlayers })
+        });
+      }
+
+      // 5. Transition to scorer screen
+      document.getElementById('setup-screen').style.display = 'none';
+      document.getElementById('scorer-screen').style.display = 'block';
+      updateUI();
+      showShareBanner();
+    } catch (e) {
+      showToast('Error starting game', 'error');
+    }
+  }
+
+  // ---------- Setup (legacy) ----------
   async function createGame() {
     const away = document.getElementById('away-team-input').value.trim();
     const home = document.getElementById('home-team-input').value.trim();
@@ -489,8 +878,9 @@
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  // Enter to submit
+  // Initialize on page load
   document.addEventListener('DOMContentLoaded', () => {
+    initSetupScreen();
     document.getElementById('play-input')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitPlay(); }
     });
