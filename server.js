@@ -32,13 +32,14 @@ function vercel(handler) {
 
 // Lazy-import handlers (so env vars are loaded first)
 async function loadRoutes() {
-  const { default: games }      = await import('./api/games.js');
-  const { default: state }      = await import('./api/game/[id]/state.js');
-  const { default: play }       = await import('./api/game/[id]/play.js');
-  const { default: count }      = await import('./api/game/[id]/count.js');
-  const { default: plays }      = await import('./api/game/[id]/plays.js');
-  const { default: teams }      = await import('./api/teams.js');
-  const { default: teamById }   = await import('./api/teams/[id].js');
+  const { default: games }        = await import('./api/games.js');
+  const { default: state }        = await import('./api/game/[id]/state.js');
+  const { default: play }         = await import('./api/game/[id]/play.js');
+  const { default: count }        = await import('./api/game/[id]/count.js');
+  const { default: plays }        = await import('./api/game/[id]/plays.js');
+  const { default: teams }        = await import('./api/teams.js');
+  const { default: teamById }     = await import('./api/teams/[id].js');
+  const { default: lineupScan }   = await import('./api/lineup/scan.js');
 
   app.get ('/api/games',              vercel(games));
   app.post('/api/games',              vercel(games));
@@ -56,6 +57,8 @@ async function loadRoutes() {
   app.post('/api/teams',              vercel(teams));
   app.get ('/api/teams/:id',          vercel(teamById));
   app.patch('/api/teams/:id',         vercel(teamById));
+
+  app.post('/api/lineup/scan',        vercel(lineupScan));
 
   const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
