@@ -37,6 +37,7 @@ async function loadRoutes() {
   const { default: play }         = await import('./api/game/[id]/play.js');
   const { default: count }        = await import('./api/game/[id]/count.js');
   const { default: plays }        = await import('./api/game/[id]/plays.js');
+  const { default: lineup }       = await import('./api/game/[id]/lineup.js');
   const { default: teams }        = await import('./api/teams.js');
   const { default: teamById }     = await import('./api/teams/[id].js');
   const { default: lineupScan }   = await import('./api/lineup/scan.js');
@@ -57,6 +58,10 @@ async function loadRoutes() {
   app.post('/api/teams',              vercel(teams));
   app.get ('/api/teams/:id',          vercel(teamById));
   app.patch('/api/teams/:id',         vercel(teamById));
+
+  app.get  ('/api/game/:id/lineup',   vercel(lineup));
+  app.post ('/api/game/:id/lineup',   vercel(lineup));
+  app.patch('/api/game/:id/lineup',   vercel(lineup));
 
   app.post('/api/lineup/scan',        vercel(lineupScan));
 
