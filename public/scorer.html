@@ -515,6 +515,14 @@
     document.getElementById(`step-${n}`).classList.add('active');
     setupStep = n;
 
+    if (n === 2) {
+      // Update lineup editor titles to show team names
+      const awayName = document.getElementById('away-team-name').value || 'Away Team';
+      const homeName = document.getElementById('home-team-name').value || 'Home Team';
+      document.getElementById('away-lineup-title').textContent = `${awayName} Lineup`;
+      document.getElementById('home-lineup-title').textContent = `${homeName} Lineup`;
+    }
+
     if (n === 3) updateSummary();
   }
 
@@ -532,16 +540,17 @@
             onchange="updateBatterName('${side}', ${idx}, this.value)">
           <select onchange="updateBatterPosition('${side}', ${idx}, this.value)">
             <option value="">Pos</option>
-            <option ${p.position === 'P' ? 'selected' : ''}>P</option>
-            <option ${p.position === 'C' ? 'selected' : ''}>C</option>
-            <option ${p.position === '1B' ? 'selected' : ''}>1B</option>
-            <option ${p.position === '2B' ? 'selected' : ''}>2B</option>
-            <option ${p.position === '3B' ? 'selected' : ''}>3B</option>
-            <option ${p.position === 'SS' ? 'selected' : ''}>SS</option>
-            <option ${p.position === 'LF' ? 'selected' : ''}>LF</option>
-            <option ${p.position === 'CF' ? 'selected' : ''}>CF</option>
-            <option ${p.position === 'RF' ? 'selected' : ''}>RF</option>
-            <option ${p.position === 'DH' ? 'selected' : ''}>DH</option>
+            <option value="P" ${p.position === 'P' ? 'selected' : ''}>P</option>
+            <option value="C" ${p.position === 'C' ? 'selected' : ''}>C</option>
+            <option value="1B" ${p.position === '1B' ? 'selected' : ''}>1B</option>
+            <option value="2B" ${p.position === '2B' ? 'selected' : ''}>2B</option>
+            <option value="3B" ${p.position === '3B' ? 'selected' : ''}>3B</option>
+            <option value="SS" ${p.position === 'SS' ? 'selected' : ''}>SS</option>
+            <option value="LF" ${p.position === 'LF' ? 'selected' : ''}>LF</option>
+            <option value="CF" ${p.position === 'CF' ? 'selected' : ''}>CF</option>
+            <option value="RF" ${p.position === 'RF' ? 'selected' : ''}>RF</option>
+            <option value="DH" ${p.position === 'DH' ? 'selected' : ''}>DH</option>
+            <option value="PH" ${p.position === 'PH' ? 'selected' : ''}>PH</option>
           </select>
           <input type="text" placeholder="#" value="${p.number || ''}"
             onchange="updateBatterNumber('${side}', ${idx}, this.value)" style="text-align: center;">
