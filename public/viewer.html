@@ -373,13 +373,21 @@
 
   function playHtml(p) {
     const type = p.structured_play?.play_type ?? '';
+    const count = p.structured_play?.count_after;
+    const summary = p.structured_play?.summary;
     const score = p.score_after
       ? `${p.score_after.away ?? 0}–${p.score_after.home ?? 0}` : '';
+    const meta = [];
+    if (count && Number.isFinite(count.balls) && Number.isFinite(count.strikes)) {
+      meta.push(`Count ${count.balls}-${count.strikes}`);
+    }
+    if (score) meta.push(`Score ${score}`);
     return `<div class="play-item">
       <span class="play-type-badge">${esc(type)}</span>
       <div>
         <div class="play-text">${esc(p.raw_input)}</div>
-        ${score ? `<div class="play-score">${score}</div>` : ''}
+        ${summary ? `<div class="play-score">${esc(summary)}</div>` : ''}
+        ${meta.length ? `<div class="play-score">${esc(meta.join(' • '))}</div>` : ''}
       </div>
     </div>`;
   }

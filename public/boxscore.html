@@ -13,7 +13,7 @@
     }
 
     h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
-    .subtitle { font-size: 13px; color: #64748b; margin-bottom: 20px; }
+    .subtitle { font-size: 13px; color: #64748b; margin-bottom: 16px; }
 
     /* Status pill */
     .status-pill {
@@ -25,36 +25,8 @@
     .status-pill.live    { background: #1c1917; color: #ef4444; border: 1px solid #ef4444; }
     .status-pill.final   { background: #1e293b; color: #64748b; border: 1px solid #334155; }
     .status-pill.scheduled { background: #1e293b; color: #64748b; border: 1px solid #334155; }
-    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #ef4444; animation: pulse 1.5s infinite; }
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #ef4444; animation: pulse 1.5s infinite; flex-shrink: 0; }
     @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.3} }
-
-    /* Box score grid */
-    .box-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; }
-    table {
-      width: 100%; border-collapse: collapse; min-width: 480px;
-      font-size: 14px;
-    }
-    th {
-      background: #1e293b; color: #64748b; font-weight: 600;
-      padding: 8px 10px; text-align: center;
-      font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
-      border-bottom: 1px solid #334155;
-    }
-    th.team-col { text-align: left; min-width: 110px; }
-    td {
-      padding: 10px; text-align: center; border-bottom: 1px solid #1e293b;
-      color: #94a3b8; font-variant-numeric: tabular-nums;
-    }
-    td.team-name { text-align: left; font-weight: 700; color: #e2e8f0; padding-left: 10px; }
-    td.total { font-weight: 800; font-size: 16px; }
-    td.total.away { color: #60a5fa; }
-    td.total.home { color: #f87171; }
-    td.sep { background: #1e293b; width: 4px; padding: 0; }
-    td.current-inning { color: #e2e8f0; background: #1e3a5f33; }
-    td.empty { color: #334155; }
-
-    /* Totals row legend */
-    .rhe-labels { display: flex; justify-content: flex-end; gap: 0; margin-bottom: 2px; }
 
     /* Scoreboard summary */
     .summary-card {
@@ -69,28 +41,63 @@
     .s-dash  { font-size: 32px; color: #334155; }
     .s-meta  { font-size: 13px; color: #64748b; margin-top: 2px; }
 
-    /* Play log */
+    /* Section title */
     .section-title {
       font-size: 11px; color: #64748b; text-transform: uppercase;
-      letter-spacing: .1em; font-weight: 600; margin-bottom: 12px;
-    }
-    .play-card { background: #1e293b; border-radius: 12px; padding: 0 16px; margin-bottom: 20px; }
-    .play-item { padding: 11px 0; border-bottom: 1px solid #0f172a; display: flex; gap: 10px; align-items: flex-start; }
-    .play-item:last-child { border-bottom: none; }
-    .play-badge {
-      flex-shrink: 0; background: #0f172a; color: #60a5fa; border-radius: 4px;
-      padding: 2px 7px; font-size: 10px; font-weight: 700; text-transform: uppercase;
-      margin-top: 1px;
-    }
-    .play-text  { font-size: 13px; color: #cbd5e1; }
-    .play-score { font-size: 11px; color: #475569; margin-top: 2px; }
-    .inning-header {
-      font-size: 11px; color: #3b82f6; font-weight: 700;
-      text-transform: uppercase; letter-spacing: .08em;
-      padding: 10px 0 4px; border-bottom: 1px solid #1e3a5f;
+      letter-spacing: .1em; font-weight: 600; margin-bottom: 10px;
     }
 
-    .no-plays { color: #475569; text-align: center; padding: 24px 0; font-size: 14px; }
+    /* Tables */
+    .box-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 20px; }
+    table {
+      border-collapse: collapse;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .linescore-table { min-width: 520px; width: 100%; }
+    .stats-table { min-width: 640px; }
+
+    th {
+      background: #1e293b; color: #64748b; font-weight: 600;
+      padding: 8px 10px; text-align: center;
+      font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+      border-bottom: 1px solid #334155;
+    }
+    th.left { text-align: left; }
+    th.team-col { text-align: left; min-width: 110px; }
+
+    td {
+      padding: 8px 10px; text-align: center; border-bottom: 1px solid #1e293b;
+      color: #94a3b8; font-variant-numeric: tabular-nums;
+    }
+    td.left { text-align: left; }
+    td.team-name { text-align: left; font-weight: 700; color: #e2e8f0; }
+    td.player-name { text-align: left; color: #e2e8f0; min-width: 120px; }
+    td.total { font-weight: 800; font-size: 15px; }
+    td.total.away { color: #60a5fa; }
+    td.total.home { color: #f87171; }
+    td.sep { background: #1e293b; width: 4px; padding: 0; }
+    td.current-inning { color: #e2e8f0; background: rgba(30,58,95,0.3); }
+    td.empty { color: #334155; }
+    td.highlight { color: #e2e8f0; font-weight: 600; }
+
+    /* Team header row inside stats table */
+    .team-header-row td {
+      background: #162032; color: #60a5fa;
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .06em; padding: 7px 10px;
+      border-bottom: 1px solid #334155;
+    }
+    .team-header-row.home td { color: #f87171; }
+
+    /* Totals row */
+    .totals-row td {
+      background: #1e293b; font-weight: 700; color: #e2e8f0;
+      border-top: 1px solid #334155; border-bottom: 2px solid #334155;
+      font-size: 12px;
+    }
+
+    .no-data { color: #475569; text-align: center; padding: 24px; font-size: 14px; }
     .loading  { text-align: center; padding: 40px; color: #475569; }
 
     /* Nav links */
@@ -100,6 +107,9 @@
       background: #1e293b; padding: 6px 12px; border-radius: 8px;
     }
     .nav a:hover { background: #334155; }
+
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: rgba(255,255,255,0.02); }
   </style>
 </head>
 <body>
@@ -110,7 +120,14 @@
   const gameId = new URLSearchParams(location.search).get('game');
   let gameState = null;
   let allPlays   = [];
+  let refreshTimer = null;
 
+  // ── play types that count as at-bats ─────────────────────────────────────
+  const AB_TYPES  = new Set(['single','double','triple','home_run','strikeout','out','error']);
+  const HIT_TYPES = new Set(['single','double','triple','home_run']);
+  const SKIP_TYPES = new Set(['ball','strike','fix']);
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
   async function init() {
     if (!gameId) {
       document.getElementById('app').innerHTML =
@@ -118,12 +135,15 @@
       return;
     }
     await refresh();
-    // Poll every 5s during live games, 30s once final
-    const tick = async () => {
-      await refresh();
-      setTimeout(tick, gameState?.status === 'final' ? 30000 : 5000);
-    };
-    setTimeout(tick, 5000);
+    scheduleRefresh();
+  }
+
+  function scheduleRefresh() {
+    const interval = gameState?.status === 'live' ? 15000 : 30000;
+    clearTimeout(refreshTimer);
+    if (gameState?.status !== 'final') {
+      refreshTimer = setTimeout(async () => { await refresh(); scheduleRefresh(); }, interval);
+    }
   }
 
   async function refresh() {
@@ -133,8 +153,7 @@
         fetch(`/api/game/${gameId}/plays`),
       ]);
       if (!stateRes.ok) {
-        document.getElementById('app').innerHTML =
-          `<div class="loading">Game not found.</div>`;
+        document.getElementById('app').innerHTML = `<div class="loading">Game not found.</div>`;
         return;
       }
       gameState = await stateRes.json();
@@ -145,33 +164,192 @@
     }
   }
 
+  // ── Stat computation ──────────────────────────────────────────────────────
+
+  /**
+   * Compute H (hits) and E (errors) from full plays log for each team.
+   * Returns { awayH, awayE, homeH, homeE }
+   */
+  function computeHE(plays) {
+    let awayH = 0, awayE = 0, homeH = 0, homeE = 0;
+    for (const p of plays) {
+      const sp = p.structured_play;
+      if (!sp || SKIP_TYPES.has(sp.play_type)) continue;
+      const isAway = p.half === 'top'; // away team bats in top half
+      if (HIT_TYPES.has(sp.play_type)) {
+        if (isAway) awayH++; else homeH++;
+      }
+      if (sp.play_type === 'error') {
+        // fielding team commits the error — opposite of batting team
+        if (isAway) homeE++; else awayE++;
+      }
+    }
+    return { awayH, awayE, homeH, homeE };
+  }
+
+  /**
+   * Compute per-batter batting stats.
+   * Returns Map<name, { ab, r, h, doubles, triples, hr, rbi, bb, so }>
+   * for a given set of plays (filtered by half).
+   */
+  function computeBatting(plays) {
+    const stats = new Map();
+    function get(name) {
+      if (!stats.has(name)) {
+        stats.set(name, { ab: 0, r: 0, h: 0, doubles: 0, triples: 0, hr: 0, rbi: 0, bb: 0, so: 0 });
+      }
+      return stats.get(name);
+    }
+
+    for (const p of plays) {
+      const sp = p.structured_play;
+      if (!sp || SKIP_TYPES.has(sp.play_type)) continue;
+      const batter = sp.batter;
+      if (!batter) continue;
+      const s = get(batter);
+
+      if (AB_TYPES.has(sp.play_type))  s.ab++;
+      if (sp.play_type === 'walk')      s.bb++;
+      if (HIT_TYPES.has(sp.play_type)) s.h++;
+      if (sp.play_type === 'double')    s.doubles++;
+      if (sp.play_type === 'triple')    s.triples++;
+      if (sp.play_type === 'home_run')  s.hr++;
+      if (sp.play_type === 'strikeout') s.so++;
+
+      // RBI = runs scored on this play attributed to batter
+      if (sp.runs_scored) s.rbi += sp.runs_scored;
+    }
+
+    // Runs scored: tally from runners
+    // runs_scored on a play is attributed to batter as RBI already done above.
+    // For R (runs scored by a player), we need to track who scored.
+    // The structured_play.runners array records who moved to 'H'.
+    for (const p of plays) {
+      const sp = p.structured_play;
+      if (!sp || SKIP_TYPES.has(sp.play_type)) continue;
+      const runners = sp.runners ?? [];
+      for (const runner of runners) {
+        if (runner.to === 'H' && runner.name) {
+          const s = get(runner.name);
+          s.r++;
+        }
+      }
+      // Also credit the batter if they hit a home run and score
+      if (sp.play_type === 'home_run' && sp.batter) {
+        // home run batter scores — but only count if not double-counted via runners
+        // Check if batter is in runners list as scoring
+        const batterAlreadyCounted = (sp.runners ?? []).some(
+          r => r.to === 'H' && r.name === sp.batter
+        );
+        if (!batterAlreadyCounted) {
+          const s = get(sp.batter);
+          s.r++;
+        }
+      }
+    }
+
+    return stats;
+  }
+
+  /**
+   * Compute per-pitcher pitching stats.
+   * Returns Map<name, { ip_outs, h, r, er, bb, so }>
+   * ip_outs = total outs recorded (convert to IP as outs/3 + (outs%3)/10 * 3)
+   */
+  function computePitching(plays) {
+    const stats = new Map();
+    function get(name) {
+      if (!stats.has(name)) {
+        stats.set(name, { ip_outs: 0, h: 0, r: 0, er: 0, bb: 0, so: 0 });
+      }
+      return stats.get(name);
+    }
+
+    for (const p of plays) {
+      const sp = p.structured_play;
+      if (!sp || SKIP_TYPES.has(sp.play_type)) continue;
+      const pitcher = sp.pitcher;
+      if (!pitcher) continue;
+      const s = get(pitcher);
+
+      if (sp.outs_recorded) s.ip_outs += sp.outs_recorded;
+      if (HIT_TYPES.has(sp.play_type)) s.h++;
+      if (sp.play_type === 'walk')     s.bb++;
+      if (sp.play_type === 'strikeout') s.so++;
+      if (sp.runs_scored) {
+        s.r  += sp.runs_scored;
+        // Treat all runs as earned unless structured_play marks them unearned
+        const unearned = sp.unearned_runs ?? 0;
+        s.er += (sp.runs_scored - unearned);
+      }
+    }
+
+    return stats;
+  }
+
+  /** Format outs count as IP string: e.g. 7 outs -> "2.1", 9 outs -> "3.0" */
+  function formatIP(outs) {
+    const full = Math.floor(outs / 3);
+    const partial = outs % 3;
+    return `${full}.${partial}`;
+  }
+
+  /** Format AVG */
+  function formatAVG(h, ab) {
+    if (ab === 0) return '.---';
+    const avg = h / ab;
+    return '.' + String(Math.round(avg * 1000)).padStart(3, '0');
+  }
+
+  /** Format ERA */
+  function formatERA(er, ip_outs) {
+    if (ip_outs === 0) return '-.--';
+    const era = (er * 27) / ip_outs; // 9 innings * 3 outs
+    return era.toFixed(2);
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
   function render() {
     const g = gameState;
+
+    // inning-by-inning scores (use buildBoxScore logic inline)
     const maxInning = Math.max(
       g.inning,
-      (g.inning_scores?.top?.length    ?? 0),
-      (g.inning_scores?.bottom?.length ?? 0),
+      g.inning_scores?.top?.length    ?? 0,
+      g.inning_scores?.bottom?.length ?? 0,
       9
     );
-
     const innings = Array.from({ length: maxInning }, (_, i) => i + 1);
 
-    // Build inning cells for each team
+    // inning cell builder
     function cells(half) {
       return innings.map(n => {
         const idx = n - 1;
         const val = g.inning_scores?.[half]?.[idx];
         const isCurrent = n === g.inning && g.half === half && g.status === 'live';
         if (val === undefined || val === null) {
-          return isCurrent
-            ? `<td class="current-inning">-</td>`
-            : `<td class="empty">·</td>`;
+          return isCurrent ? `<td class="current-inning">-</td>` : `<td class="empty">·</td>`;
         }
-        return isCurrent
-          ? `<td class="current-inning">${val}</td>`
-          : `<td>${val}</td>`;
+        return isCurrent ? `<td class="current-inning">${val}</td>` : `<td>${val}</td>`;
       }).join('');
     }
+
+    // H and E
+    const { awayH, awayE, homeH, homeE } = computeHE(allPlays);
+
+    // plays (oldest first) — filter by batting half for each team
+    const playsOldestFirst = [...allPlays].reverse();
+    const awayPlays = playsOldestFirst.filter(p => p.half === 'top');
+    const homePlays = playsOldestFirst.filter(p => p.half === 'bottom');
+
+    // Batting stats
+    const awayBatting = computeBatting(awayPlays);
+    const homeBatting = computeBatting(homePlays);
+
+    // Pitching: away pitcher throws in the bottom half (home bats); home pitcher throws in the top half (away bats)
+    const awayPitcherStats = computePitching(homePlays);
+    const homePitcherStats = computePitching(awayPlays);
 
     // Status pill
     const pill = g.status === 'live'
@@ -180,24 +358,14 @@
         ? `<div class="status-pill final">Final</div>`
         : `<div class="status-pill scheduled">Scheduled</div>`;
 
-    // Play log grouped by inning/half
-    const playsByHalf = {};
-    const plays = [...allPlays].reverse(); // oldest first
-    for (const p of plays) {
-      const key = `${p.inning}-${p.half}`;
-      if (!playsByHalf[key]) playsByHalf[key] = { inning: p.inning, half: p.half, plays: [] };
-      playsByHalf[key].plays.push(p);
-    }
-    const playGroups = Object.values(playsByHalf);
-
     document.getElementById('app').innerHTML = `
       <div class="nav">
-        <a href="/viewer.html?game=${gameId}">📺 Watch</a>
+        <a href="/viewer.html?game=${encodeURIComponent(gameId)}">📺 Watch</a>
         <a href="/scorer.html">⚾ Scorer</a>
       </div>
 
       <h1>${esc(g.away_team)} @ ${esc(g.home_team)}</h1>
-      <div class="subtitle">${g.game_date ?? ''}</div>
+      <div class="subtitle">${esc(g.game_date ?? '')}</div>
       ${pill}
 
       <!-- Scoreboard summary -->
@@ -213,16 +381,18 @@
         </div>
       </div>
 
-      <!-- Box score grid -->
+      <!-- Line Score -->
       <div class="section-title">Line Score</div>
       <div class="box-wrap">
-        <table>
+        <table class="linescore-table">
           <thead>
             <tr>
               <th class="team-col">Team</th>
               ${innings.map(n => `<th>${n}</th>`).join('')}
               <td class="sep"></td>
               <th>R</th>
+              <th>H</th>
+              <th>E</th>
             </tr>
           </thead>
           <tbody>
@@ -231,40 +401,143 @@
               ${cells('top')}
               <td class="sep"></td>
               <td class="total away">${g.away_score}</td>
+              <td class="total away">${awayH}</td>
+              <td class="total">${awayE}</td>
             </tr>
             <tr>
               <td class="team-name">${esc(g.home_team)}</td>
               ${cells('bottom')}
               <td class="sep"></td>
               <td class="total home">${g.home_score}</td>
+              <td class="total home">${homeH}</td>
+              <td class="total">${homeE}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Play log -->
-      <div class="section-title">Play by Play</div>
-      <div class="play-card">
-        ${playGroups.length === 0
-          ? '<div class="no-plays">No plays yet</div>'
-          : playGroups.map(group => `
-              <div class="inning-header">${ordinal(group.inning, group.half)}</div>
-              ${group.plays.map(p => {
-                const type  = p.structured_play?.play_type ?? '';
-                const score = p.score_after
-                  ? `${p.score_after.away ?? 0}–${p.score_after.home ?? 0}` : '';
-                return `<div class="play-item">
-                  <span class="play-badge">${esc(type)}</span>
-                  <div>
-                    <div class="play-text">${esc(p.raw_input)}</div>
-                    ${score ? `<div class="play-score">${score}</div>` : ''}
-                  </div>
-                </div>`;
-              }).join('')}
-            `).join('')
-        }
+      <!-- Batting Stats -->
+      <div class="section-title">Batting</div>
+      <div class="box-wrap">
+        ${buildBattingTable(g.away_team, g.home_team, awayBatting, homeBatting)}
+      </div>
+
+      <!-- Pitching Stats -->
+      <div class="section-title">Pitching</div>
+      <div class="box-wrap">
+        ${buildPitchingTable(g.away_team, g.home_team, awayPitcherStats, homePitcherStats)}
       </div>
     `;
+  }
+
+  function buildBattingTable(awayTeam, homeTeam, awayStats, homeStats) {
+    const header = `
+      <tr>
+        <th class="left" style="min-width:120px;">Batter</th>
+        <th>AB</th><th>R</th><th>H</th>
+        <th>2B</th><th>3B</th><th>HR</th>
+        <th>RBI</th><th>BB</th><th>SO</th>
+        <th>AVG</th>
+      </tr>`;
+
+    function rows(statsMap, isHome) {
+      if (statsMap.size === 0) {
+        return `<tr class="${isHome ? 'team-header-row home' : 'team-header-row'}">
+          <td colspan="11">${isHome ? esc(homeTeam) : esc(awayTeam)}</td>
+        </tr>
+        <tr><td class="no-data" colspan="11">No batting data yet</td></tr>`;
+      }
+
+      let totals = { ab: 0, r: 0, h: 0, doubles: 0, triples: 0, hr: 0, rbi: 0, bb: 0, so: 0 };
+      const playerRows = [...statsMap.entries()].map(([name, s]) => {
+        totals.ab += s.ab; totals.r += s.r; totals.h += s.h;
+        totals.doubles += s.doubles; totals.triples += s.triples; totals.hr += s.hr;
+        totals.rbi += s.rbi; totals.bb += s.bb; totals.so += s.so;
+        return `<tr>
+          <td class="player-name">${esc(name)}</td>
+          <td>${s.ab}</td>
+          <td class="${s.r > 0 ? 'highlight' : ''}">${s.r}</td>
+          <td class="${s.h > 0 ? 'highlight' : ''}">${s.h}</td>
+          <td>${s.doubles}</td><td>${s.triples}</td>
+          <td class="${s.hr > 0 ? 'highlight' : ''}">${s.hr}</td>
+          <td class="${s.rbi > 0 ? 'highlight' : ''}">${s.rbi}</td>
+          <td>${s.bb}</td><td>${s.so}</td>
+          <td>${formatAVG(s.h, s.ab)}</td>
+        </tr>`;
+      }).join('');
+
+      const totalsRow = `<tr class="totals-row">
+        <td class="left">Totals</td>
+        <td>${totals.ab}</td>
+        <td>${totals.r}</td>
+        <td>${totals.h}</td>
+        <td>${totals.doubles}</td><td>${totals.triples}</td>
+        <td>${totals.hr}</td>
+        <td>${totals.rbi}</td>
+        <td>${totals.bb}</td><td>${totals.so}</td>
+        <td></td>
+      </tr>`;
+
+      return `<tr class="${isHome ? 'team-header-row home' : 'team-header-row'}">
+        <td colspan="11">${isHome ? esc(homeTeam) : esc(awayTeam)}</td>
+      </tr>
+      ${playerRows}
+      ${totalsRow}`;
+    }
+
+    return `<table class="stats-table">
+      <thead>${header}</thead>
+      <tbody>
+        ${rows(awayStats, false)}
+        ${rows(homeStats, true)}
+      </tbody>
+    </table>`;
+  }
+
+  function buildPitchingTable(awayTeam, homeTeam, awayStats, homeStats) {
+    const header = `
+      <tr>
+        <th class="left" style="min-width:120px;">Pitcher</th>
+        <th>IP</th><th>H</th><th>R</th><th>ER</th>
+        <th>BB</th><th>SO</th><th>ERA</th>
+      </tr>`;
+
+    function rows(statsMap, teamName, isHome) {
+      if (statsMap.size === 0) {
+        return `<tr class="${isHome ? 'team-header-row home' : 'team-header-row'}">
+          <td colspan="8">${esc(teamName)}</td>
+        </tr>
+        <tr><td class="no-data" colspan="8">No pitching data yet</td></tr>`;
+      }
+
+      const playerRows = [...statsMap.entries()].map(([name, s]) => {
+        const ip = formatIP(s.ip_outs);
+        const era = formatERA(s.er, s.ip_outs);
+        return `<tr>
+          <td class="player-name">${esc(name)}</td>
+          <td>${ip}</td>
+          <td>${s.h}</td>
+          <td>${s.r}</td>
+          <td>${s.er}</td>
+          <td>${s.bb}</td>
+          <td>${s.so}</td>
+          <td>${era}</td>
+        </tr>`;
+      }).join('');
+
+      return `<tr class="${isHome ? 'team-header-row home' : 'team-header-row'}">
+        <td colspan="8">${esc(teamName)}</td>
+      </tr>
+      ${playerRows}`;
+    }
+
+    return `<table class="stats-table">
+      <thead>${header}</thead>
+      <tbody>
+        ${rows(awayStats, awayTeam, false)}
+        ${rows(homeStats, homeTeam, true)}
+      </tbody>
+    </table>`;
   }
 
   function ordinal(inning, half) {

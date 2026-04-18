@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Teams — GameStreamer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #f1f5f9;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid #1e293b;
+      position: sticky; top: 0; z-index: 10;
+      background: #0f172a;
+    }
+    .header-left {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .header-logo { font-size: 22px; }
+    .header-title {
+      font-size: 18px; font-weight: 800; letter-spacing: -.02em;
+    }
+    .header-right {
+      display: flex; align-items: center; gap: 12px;
+    }
+    .header-email {
+      font-size: 13px; color: #64748b;
+      max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .btn-signout {
+      background: #1e293b; color: #94a3b8;
+      border: 1px solid #334155; border-radius: 8px;
+      padding: 7px 12px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: background .15s, color .15s;
+      white-space: nowrap;
+    }
+    .btn-signout:hover { background: #334155; color: #e2e8f0; }
+
+    /* ── Page body ── */
+    .page {
+      max-width: 640px; margin: 0 auto;
+      padding: 28px 20px 100px;
+    }
+
+    .page-heading {
+      font-size: 22px; font-weight: 800; letter-spacing: -.02em;
+      margin-bottom: 4px;
+    }
+    .page-sub {
+      font-size: 14px; color: #64748b;
+      margin-bottom: 24px;
+    }
+
+    /* ── Team cards ── */
+    .team-list {
+      display: flex; flex-direction: column; gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .team-card {
+      background: #1e293b;
+      border: 1px solid #1e293b;
+      border-radius: 14px;
+      padding: 18px 20px;
+      display: flex; align-items: center; gap: 14px;
+      text-decoration: none; color: inherit;
+      transition: background .15s, border-color .15s, transform .1s;
+    }
+    .team-card:hover {
+      background: #253347;
+      border-color: #334155;
+      transform: translateY(-1px);
+    }
+    .team-card:active { transform: translateY(0); }
+
+    .team-card-body { flex: 1; min-width: 0; }
+    .team-card-name {
+      font-size: 17px; font-weight: 700;
+      margin-bottom: 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .team-card-meta {
+      font-size: 13px; color: #64748b;
+    }
+
+    .team-card-right {
+      display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+    }
+
+    .badge {
+      display: inline-flex; align-items: center;
+      border-radius: 6px; padding: 3px 9px;
+      font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+    }
+    .badge-owner  { background: #14532d; color: #4ade80; }
+    .badge-shared { background: #1e3a5f; color: #60a5fa; }
+
+    .team-card-arrow { font-size: 20px; color: #334155; }
+
+    /* ── Skeleton ── */
+    .skeleton-card {
+      background: #1e293b; border-radius: 14px; padding: 18px 20px;
+      display: flex; align-items: center; gap: 14px;
+      border: 1px solid #1e293b;
+    }
+    .skel {
+      background: #263246;
+      border-radius: 6px;
+      animation: shimmer 1.4s ease-in-out infinite;
+    }
+    @keyframes shimmer {
+      0%, 100% { opacity: 1; }
+      50% { opacity: .4; }
+    }
+    .skel-title { height: 18px; width: 55%; }
+    .skel-meta  { height: 13px; width: 35%; margin-top: 6px; }
+    .skel-badge { height: 22px; width: 62px; border-radius: 6px; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 60px 24px;
+      background: #1e293b;
+      border-radius: 16px;
+      border: 1px dashed #334155;
+    }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; }
+    .empty-title {
+      font-size: 18px; font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .empty-sub {
+      font-size: 14px; color: #64748b;
+      margin-bottom: 28px; line-height: 1.5;
+    }
+    .btn-cta {
+      display: inline-block;
+      background: #3b82f6; color: white;
+      border: none; border-radius: 10px;
+      padding: 13px 24px; font-size: 15px; font-weight: 600;
+      text-decoration: none;
+      cursor: pointer; transition: background .2s;
+    }
+    .btn-cta:hover { background: #2563eb; }
+
+    /* ── New Team FAB ── */
+    .fab {
+      position: fixed; bottom: 28px; right: 24px;
+      background: #3b82f6; color: white;
+      border: none; border-radius: 14px;
+      padding: 14px 22px; font-size: 15px; font-weight: 700;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+      box-shadow: 0 4px 24px rgba(59,130,246,.4);
+      cursor: pointer; transition: background .2s, transform .1s;
+      z-index: 20;
+    }
+    .fab:hover { background: #2563eb; transform: translateY(-1px); }
+    .fab:active { transform: translateY(0); }
+
+    /* ── Error banner ── */
+    .error-banner {
+      background: #3f1d1d; border: 1px solid #7f1d1d; border-radius: 10px;
+      color: #fca5a5; font-size: 14px; padding: 14px 16px;
+      margin-bottom: 20px; display: none;
+    }
+    .error-banner.visible { display: block; }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-left">
+      <span class="header-logo">⚾</span>
+      <span class="header-title">GameStreamer</span>
+    </div>
+    <div class="header-right">
+      <span class="header-email" id="user-email"></span>
+      <button class="btn-signout" onclick="signOut()">Sign Out</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <h1 class="page-heading">My Teams</h1>
+    <p class="page-sub">Manage your rosters and lineups</p>
+
+    <div class="error-banner" id="error-banner"></div>
+
+    <!-- Loading skeletons -->
+    <div class="team-list" id="skeleton-list">
+      <div class="skeleton-card">
+        <div style="flex:1">
+          <div class="skel skel-title"></div>
+          <div class="skel skel-meta"></div>
+        </div>
+        <div class="skel skel-badge"></div>
+      </div>
+      <div class="skeleton-card">
+        <div style="flex:1">
+          <div class="skel skel-title" style="width:45%"></div>
+          <div class="skel skel-meta" style="width:28%"></div>
+        </div>
+        <div class="skel skel-badge"></div>
+      </div>
+      <div class="skeleton-card">
+        <div style="flex:1">
+          <div class="skel skel-title" style="width:60%"></div>
+          <div class="skel skel-meta" style="width:40%"></div>
+        </div>
+        <div class="skel skel-badge"></div>
+      </div>
+    </div>
+
+    <!-- Team list (populated by JS) -->
+    <div class="team-list" id="team-list" style="display:none"></div>
+
+    <!-- Empty state -->
+    <div class="empty-state" id="empty-state" style="display:none">
+      <div class="empty-icon">⚾</div>
+      <div class="empty-title">No teams yet</div>
+      <p class="empty-sub">Create your first team to start building<br>rosters and scoring games.</p>
+      <a href="/create-team.html" class="btn-cta">Create your first team</a>
+    </div>
+  </main>
+
+  <a href="/create-team.html" class="fab" id="new-team-fab">
+    <span>＋</span> New Team
+  </a>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://izddxiligsqzbnorcwlf.supabase.co';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6ZGR4aWxpZ3NxemJub3Jjd2xmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTY2NTcsImV4cCI6MjA5MDM5MjY1N30.NMb5P8Iaxdc4TpuNhXbGwMyP7reL2ruvdlh-MUNJTdk';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    function showError(msg) {
+      const el = document.getElementById('error-banner');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function playerLabel(players) {
+      const count = Array.isArray(players) ? players.length : 0;
+      return count === 1 ? '1 player' : `${count} players`;
+    }
+
+    function renderTeams(teams) {
+      document.getElementById('skeleton-list').style.display = 'none';
+
+      if (teams.length === 0) {
+        document.getElementById('empty-state').style.display = 'block';
+        document.getElementById('new-team-fab').style.display = 'none';
+        return;
+      }
+
+      const list = document.getElementById('team-list');
+      list.style.display = 'flex';
+
+      list.innerHTML = teams.map(team => {
+        const isOwner = team.role === 'owner';
+        const badgeClass = isOwner ? 'badge-owner' : 'badge-shared';
+        const badgeLabel = isOwner ? 'Owner' : 'Shared';
+        return `
+          <a href="/team.html?id=${escHtml(team.id)}" class="team-card">
+            <div class="team-card-body">
+              <div class="team-card-name">${escHtml(team.name)}</div>
+              <div class="team-card-meta">${escHtml(playerLabel(team.players))}</div>
+            </div>
+            <div class="team-card-right">
+              <span class="badge ${badgeClass}">${badgeLabel}</span>
+              <span class="team-card-arrow">›</span>
+            </div>
+          </a>
+        `;
+      }).join('');
+    }
+
+    async function loadTeams(token) {
+      try {
+        const res = await fetch('/api/teams', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          showError(data.error || `Failed to load teams (${res.status})`);
+          document.getElementById('skeleton-list').style.display = 'none';
+          return;
+        }
+        const teams = await res.json();
+        renderTeams(teams);
+      } catch (e) {
+        document.getElementById('skeleton-list').style.display = 'none';
+        showError('Network error — could not load teams. Please refresh.');
+      }
+    }
+
+    async function signOut() {
+      await supabaseClient.auth.signOut();
+      window.location.href = '/login.html';
+    }
+
+    async function init() {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      // Show email in header
+      const email = session.user?.email ?? '';
+      document.getElementById('user-email').textContent = email;
+
+      await loadTeams(session.access_token);
+    }
+
+    init();
+  </script>
+</body>
+</html>

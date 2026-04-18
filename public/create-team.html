@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Create Team — GameStreamer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #f1f5f9;
+      min-height: 100vh; padding: 16px;
+    }
+    .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .header h1 { font-size: 18px; font-weight: 700; }
+    .header-back { color: #60a5fa; text-decoration: none; font-size: 14px; font-weight: 600; }
+    .header-back:hover { color: #3b82f6; }
+
+    .form-card {
+      background: #1e293b; border-radius: 12px; padding: 20px; margin-bottom: 16px;
+    }
+    .form-card h2 {
+      font-size: 15px; font-weight: 700; color: #94a3b8;
+      text-transform: uppercase; letter-spacing: .05em;
+      margin-bottom: 14px;
+    }
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block; font-size: 12px; font-weight: 600; color: #94a3b8;
+      text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px;
+    }
+    input[type=text], input[type=number], select {
+      width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px;
+      color: #f1f5f9; padding: 11px 12px; font-size: 15px; outline: none;
+      transition: border-color .2s; font-family: inherit;
+    }
+    input[type=text]:focus, input[type=number]:focus, select:focus { border-color: #3b82f6; }
+    select {
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat; background-position: right 10px center; background-size: 18px;
+      padding-right: 36px;
+    }
+    .char-count { font-size: 11px; color: #475569; margin-top: 4px; text-align: right; }
+    .char-count.over { color: #ef4444; }
+
+    /* Lineup editor — exact match to scorer.html */
+    .lineup-editor { background: #0f172a; border-radius: 12px; padding: 16px; }
+    .lineup-editor h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: #e2e8f0; }
+    .lineup-rows { display: flex; flex-direction: column; gap: 10px; }
+    .lineup-row {
+      display: grid;
+      grid-template-columns: 40px 1fr 72px 56px 32px;
+      gap: 6px;
+      align-items: center;
+    }
+    .lineup-row input, .lineup-row select { padding: 8px; font-size: 13px; margin-bottom: 0; }
+    .lineup-row input[type=number] { text-align: center; padding: 8px 4px; }
+    .btn-remove-row {
+      background: none; border: none; color: #475569; font-size: 18px; cursor: pointer;
+      padding: 4px; line-height: 1; border-radius: 4px; transition: color .15s;
+    }
+    .btn-remove-row:hover { color: #f87171; }
+    .lineup-actions { display: flex; gap: 8px; margin-top: 12px; align-items: center; flex-wrap: wrap; }
+    .btn-add-player {
+      background: #334155; color: #94a3b8; border: 1px solid #475569;
+      padding: 8px 14px; border-radius: 6px; font-size: 13px; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-add-player:hover { background: #475569; }
+    .btn-scan-lineup {
+      background: #3b82f6; color: white; border: none;
+      padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer;
+      display: flex; align-items: center; gap: 6px; transition: background .15s;
+    }
+    .btn-scan-lineup:hover { background: #2563eb; }
+    .btn-scan-lineup:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+    #scan-file-input { display: none; }
+
+    .action-row { display: flex; gap: 10px; margin-top: 8px; }
+    .btn-save {
+      flex: 1; background: #22c55e; color: white; border: none; border-radius: 10px;
+      padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background .2s;
+    }
+    .btn-save:hover { background: #16a34a; }
+    .btn-save:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+    .btn-cancel {
+      background: #334155; color: #e2e8f0; border: none; border-radius: 10px;
+      padding: 14px 20px; font-size: 16px; font-weight: 600; cursor: pointer;
+      text-decoration: none; display: flex; align-items: center; justify-content: center;
+      transition: background .2s;
+    }
+    .btn-cancel:hover { background: #475569; }
+
+    .error-msg {
+      background: #3f1d1d; border: 1px solid #7f1d1d; border-radius: 8px;
+      color: #fca5a5; padding: 12px 14px; font-size: 14px;
+      margin-bottom: 14px; display: none;
+    }
+    .error-msg.visible { display: block; }
+
+    .loading-spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,.3); border-top-color: white;
+      border-radius: 50%; animation: spin .7s linear infinite;
+      margin-right: 6px; vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #1e293b; border: 1px solid #334155; border-radius: 10px;
+      padding: 12px 20px; font-size: 14px; opacity: 0; transition: opacity .3s;
+      pointer-events: none; z-index: 100; max-width: 90vw; text-align: center;
+    }
+    .toast.show { opacity: 1; }
+    .toast.error { border-color: #ef4444; color: #fca5a5; }
+    .toast.success { border-color: #22c55e; color: #86efac; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⚾ Create Team</h1>
+  <a href="/teams.html" class="header-back">← Teams</a>
+</div>
+
+<div id="error-msg" class="error-msg"></div>
+
+<!-- Team Name -->
+<div class="form-card">
+  <h2>Team Info</h2>
+  <div class="field">
+    <label for="team-name">Team Name <span style="color:#ef4444">*</span></label>
+    <input
+      type="text"
+      id="team-name"
+      placeholder="e.g. River City Rockets"
+      maxlength="50"
+      oninput="updateCharCount()"
+      autocomplete="off"
+    />
+    <div class="char-count" id="char-count">0 / 50</div>
+  </div>
+</div>
+
+<!-- Roster Editor -->
+<div class="form-card">
+  <h2>Player Roster</h2>
+  <div class="lineup-editor">
+    <div class="lineup-rows" id="lineup-rows"></div>
+    <div class="lineup-actions">
+      <button class="btn-add-player" onclick="addPlayerRow()">+ Add Player</button>
+      <button class="btn-scan-lineup" id="scan-btn" onclick="triggerScan()">
+        📷 Scan Lineup Card
+      </button>
+      <input type="file" id="scan-file-input" accept="image/*" onchange="handleScan(event)" />
+    </div>
+  </div>
+</div>
+
+<!-- Save / Cancel -->
+<div class="action-row">
+  <a href="/teams.html" class="btn-cancel">Cancel</a>
+  <button class="btn-save" id="save-btn" onclick="saveTeam()">Save Team</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+  const SUPABASE_URL = 'https://izddxiligsqzbnorcwlf.supabase.co';
+  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6ZGR4aWxpZ3NxemJub3Jjd2xmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTY2NTcsImV4cCI6MjA5MDM5MjY1N30.NMb5P8Iaxdc4TpuNhXbGwMyP7reL2ruvdlh-MUNJTdk';
+
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+  // ── Auth check ────────────────────────────────────────────────────────────
+  (async () => {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      window.location.href = '/login.html';
+    }
+  })();
+
+  // ── Player state ──────────────────────────────────────────────────────────
+  const POSITIONS = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'PH'];
+
+  let players = [];
+
+  // Pre-fill 9 empty rows with batting orders 1–9
+  for (let i = 1; i <= 9; i++) {
+    players.push({ batting_order: i, name: '', position: '', number: '' });
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  function renderRows() {
+    const container = document.getElementById('lineup-rows');
+    container.innerHTML = players.map((p, idx) => `
+      <div class="lineup-row" id="row-${idx}">
+        <input
+          type="number" min="1" max="9"
+          value="${escAttr(String(p.batting_order || idx + 1))}"
+          title="Batting order"
+          onchange="updateField(${idx}, 'batting_order', parseInt(this.value) || ${idx + 1})"
+        />
+        <input
+          type="text"
+          placeholder="Player name"
+          value="${escAttr(p.name || '')}"
+          onchange="updateField(${idx}, 'name', this.value)"
+        />
+        <select
+          title="Position"
+          onchange="updateField(${idx}, 'position', this.value)"
+        >
+          <option value="">Pos</option>
+          ${POSITIONS.map(pos =>
+            `<option value="${pos}"${p.position === pos ? ' selected' : ''}>${pos}</option>`
+          ).join('')}
+        </select>
+        <input
+          type="text"
+          placeholder="#"
+          value="${escAttr(p.number || '')}"
+          title="Jersey number"
+          style="text-align:center"
+          onchange="updateField(${idx}, 'number', this.value)"
+        />
+        <button
+          class="btn-remove-row"
+          title="Remove player"
+          onclick="removeRow(${idx})"
+        >×</button>
+      </div>
+    `).join('');
+  }
+
+  function updateField(idx, field, value) {
+    players[idx][field] = value;
+  }
+
+  function addPlayerRow() {
+    const maxOrder = players.length
+      ? Math.max(...players.map(p => p.batting_order || 0))
+      : 0;
+    players.push({ batting_order: maxOrder + 1, name: '', position: '', number: '' });
+    renderRows();
+    // Focus the new row's name input
+    const rows = document.querySelectorAll('.lineup-row');
+    const lastRow = rows[rows.length - 1];
+    if (lastRow) {
+      const nameInput = lastRow.querySelectorAll('input[type=text]')[0];
+      if (nameInput) nameInput.focus();
+    }
+  }
+
+  function removeRow(idx) {
+    players.splice(idx, 1);
+    renderRows();
+  }
+
+  // ── Char count ────────────────────────────────────────────────────────────
+  function updateCharCount() {
+    const val = document.getElementById('team-name').value;
+    const el = document.getElementById('char-count');
+    el.textContent = `${val.length} / 50`;
+    el.classList.toggle('over', val.length > 50);
+  }
+
+  // ── Scan lineup card ─────────────────────────────────────────────────────
+  // Exact scan logic from scorer.html lines ~636–673
+  function triggerScan() {
+    document.getElementById('scan-file-input').click();
+  }
+
+  async function handleScan(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64 = e.target.result.split(',')[1];
+      const mediaType = file.type || 'image/jpeg';
+
+      const scanBtn = document.getElementById('scan-btn');
+      scanBtn.disabled = true;
+      scanBtn.innerHTML = '<span class="loading-spinner"></span>Scanning…';
+
+      try {
+        showToast('Scanning lineup card…', '');
+        const res = await fetch('/api/lineup/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_base64: base64, media_type: mediaType })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+          showToast(`Scan failed: ${data.error}`, 'error');
+          return;
+        }
+
+        if (data.players && Array.isArray(data.players)) {
+          players = data.players;
+          renderRows();
+          showToast(`Scanned ${data.players.length} players ✓`, 'success');
+        }
+      } catch (err) {
+        showToast('Network error — try again', 'error');
+      } finally {
+        scanBtn.disabled = false;
+        scanBtn.innerHTML = '📷 Scan Lineup Card';
+        // Reset file input so the same file can trigger again if needed
+        event.target.value = '';
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ── Save team ─────────────────────────────────────────────────────────────
+  async function saveTeam() {
+    hideError();
+
+    // Read team name from DOM (captures any in-flight edits)
+    const nameInput = document.getElementById('team-name');
+    const name = nameInput.value.trim();
+
+    if (!name) {
+      showError('Team name is required.');
+      nameInput.focus();
+      return;
+    }
+    if (name.length > 50) {
+      showError('Team name must be 50 characters or fewer.');
+      nameInput.focus();
+      return;
+    }
+
+    // Collect current row values from DOM before submitting
+    // (handles the case where onchange hasn't fired for focused inputs)
+    const rows = document.querySelectorAll('.lineup-row');
+    rows.forEach((row, idx) => {
+      if (!players[idx]) return;
+      const inputs = row.querySelectorAll('input');
+      const sel = row.querySelector('select');
+      players[idx].batting_order = parseInt(inputs[0].value) || idx + 1;
+      players[idx].name = inputs[1].value;
+      players[idx].position = sel ? sel.value : '';
+      players[idx].number = inputs[2].value || null;
+    });
+
+    const cleanPlayers = players
+      .filter(p => p.name && p.name.trim())
+      .map(p => ({
+        batting_order: p.batting_order,
+        name: p.name.trim(),
+        position: p.position || null,
+        number: p.number || null,
+      }));
+
+    const saveBtn = document.getElementById('save-btn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="loading-spinner"></span>Saving…';
+
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      const token = session?.access_token;
+
+      if (!token) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      const res = await fetch('/api/teams', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name, players: cleanPlayers }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        showError(data.error || 'Failed to save team. Please try again.');
+        return;
+      }
+
+      window.location.href = '/teams.html';
+    } catch (err) {
+      showError('Network error — please try again.');
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save Team';
+    }
+  }
+
+  // ── Utilities ─────────────────────────────────────────────────────────────
+  function showError(msg) {
+    const el = document.getElementById('error-msg');
+    el.textContent = msg;
+    el.classList.add('visible');
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function hideError() {
+    document.getElementById('error-msg').classList.remove('visible');
+  }
+
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast show ${type}`;
+    setTimeout(() => t.classList.remove('show'), 3500);
+  }
+
+  function escAttr(s) {
+    return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    renderRows();
+  });
+</script>
+</body>
+</html>

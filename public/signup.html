@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Account — GameStreamer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a; color: #f1f5f9;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 24px;
+    }
+
+    .logo { font-size: 32px; margin-bottom: 8px; }
+    .app-name { font-size: 22px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 4px; }
+    .app-sub { font-size: 14px; color: #64748b; margin-bottom: 32px; }
+
+    .card {
+      background: #1e293b;
+      border-radius: 12px;
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 380px;
+      border: 1px solid #334155;
+    }
+
+    .card-title {
+      font-size: 18px; font-weight: 700;
+      margin-bottom: 20px;
+    }
+
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block;
+      font-size: 13px; font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin-bottom: 6px;
+    }
+    .field input {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      color: #f1f5f9;
+      padding: 12px 14px;
+      font-size: 16px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .field input:focus { border-color: #3b82f6; }
+    .field input::placeholder { color: #475569; }
+
+    .field-hint {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 5px;
+    }
+
+    .error-msg {
+      background: #3f1d1d;
+      border: 1px solid #7f1d1d;
+      border-radius: 10px;
+      color: #fca5a5;
+      font-size: 14px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .error-msg.visible { display: block; }
+
+    .success-msg {
+      background: #16301f;
+      border: 1px solid #166534;
+      border-radius: 10px;
+      color: #bbf7d0;
+      font-size: 14px;
+      padding: 12px 14px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .success-msg.visible { display: block; }
+
+    .btn-submit {
+      width: 100%;
+      background: #22c55e;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 16px; font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+      display: flex; align-items: center; justify-content: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .btn-submit:hover { background: #16a34a; }
+    .btn-submit:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.25);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #334155;
+      margin: 24px 0;
+    }
+
+    .footer-links {
+      text-align: center;
+      font-size: 14px;
+      color: #64748b;
+    }
+    .footer-links a {
+      color: #60a5fa;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .footer-links a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <div class="logo">⚾</div>
+  <div class="app-name">GameStreamer</div>
+  <div class="app-sub">Youth baseball live scoring &amp; streaming</div>
+
+  <div class="card">
+    <div class="card-title">Create your account</div>
+
+    <div class="error-msg" id="error-msg"></div>
+    <div class="success-msg" id="success-msg"></div>
+
+    <form id="signup-form" onsubmit="handleSignup(event)">
+      <div class="field">
+        <label for="name">Name</label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          placeholder="Your full name"
+          autocomplete="name"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="email">Email</label>
+        <input
+          type="email"
+          id="email"
+          name="email"
+          placeholder="you@example.com"
+          autocomplete="email"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          name="password"
+          placeholder="Choose a password"
+          autocomplete="new-password"
+          required
+          minlength="6"
+        />
+        <div class="field-hint">At least 6 characters</div>
+      </div>
+
+      <button type="submit" class="btn-submit" id="submit-btn">
+        Create Account
+      </button>
+    </form>
+
+    <hr class="divider" />
+
+    <div class="footer-links">
+      Already have an account? <a href="/login.html">Sign in</a>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://izddxiligsqzbnorcwlf.supabase.co';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6ZGR4aWxpZ3NxemJub3Jjd2xmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTY2NTcsImV4cCI6MjA5MDM5MjY1N30.NMb5P8Iaxdc4TpuNhXbGwMyP7reL2ruvdlh-MUNJTdk';
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    // Capture invite token from URL before anything else
+    (function captureInviteToken() {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('invite');
+      if (token) {
+        sessionStorage.setItem('pendingInviteToken', token);
+      }
+    })();
+
+    function showError(msg) {
+      hideSuccess();
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+
+    function hideError() {
+      document.getElementById('error-msg').classList.remove('visible');
+    }
+
+    function showSuccess(msg) {
+      hideError();
+      const el = document.getElementById('success-msg');
+      el.textContent = msg;
+      el.classList.add('visible');
+    }
+
+    function hideSuccess() {
+      document.getElementById('success-msg').classList.remove('visible');
+    }
+
+    function setLoading(loading) {
+      const btn = document.getElementById('submit-btn');
+      if (loading) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span>Creating account…';
+      } else {
+        btn.disabled = false;
+        btn.textContent = 'Create Account';
+      }
+    }
+
+    function getFriendlyError(error) {
+      const msg = error.message || '';
+      if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('user already exists')) {
+        return 'An account with this email already exists. Try signing in instead.';
+      }
+      if (msg.toLowerCase().includes('password')) {
+        return 'Password must be at least 6 characters.';
+      }
+      if (msg.toLowerCase().includes('email')) {
+        return 'Please enter a valid email address.';
+      }
+      return msg || 'Sign-up failed. Please try again.';
+    }
+
+    async function handleSignup(e) {
+      e.preventDefault();
+      hideError();
+      hideSuccess();
+
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!name) {
+        showError('Please enter your name.');
+        return;
+      }
+      if (!email) {
+        showError('Please enter your email address.');
+        return;
+      }
+      if (password.length < 6) {
+        showError('Password must be at least 6 characters.');
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const { data, error } = await supabaseClient.auth.signUp({
+          email,
+          password,
+          options: {
+            data: { name }
+          }
+        });
+
+        if (error) {
+          showError(getFriendlyError(error));
+          setLoading(false);
+          return;
+        }
+
+        const duplicateAccount = Array.isArray(data?.user?.identities) && data.user.identities.length === 0;
+
+        if (duplicateAccount) {
+          showError('An account with this email already exists. Try signing in instead.');
+          setLoading(false);
+          return;
+        }
+
+        if (data?.session) {
+          window.location.href = '/index.html';
+          return;
+        }
+
+        if (data?.user) {
+          showSuccess('Account created. Check your email for the confirmation link, then sign in.');
+          setLoading(false);
+          return;
+        }
+
+        showError('We could not create your account. Please try again.');
+        setLoading(false);
+      } catch (err) {
+        showError('An unexpected error occurred. Please try again.');
+        setLoading(false);
+      }
+    }
+  </script>
+</body>
+</html>

@@ -13,7 +13,9 @@
     }
     .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
     .header h1 { font-size: 18px; font-weight: 700; }
+    .header-actions { display: flex; align-items: center; gap: 10px; }
     .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #22c55e; display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+    .status-dot.final { background: #94a3b8; animation: none; }
     @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.4 } }
 
     /* Scoreboard */
@@ -69,6 +71,18 @@
       padding: 14px 16px; font-size: 16px; cursor: pointer; transition: background .2s;
     }
     .btn-undo:hover { background: #475569; }
+    .session-actions { display: flex; gap: 8px; margin-bottom: 16px; }
+    .btn-secondary, .btn-danger {
+      flex: 1; border: none; border-radius: 10px; padding: 12px 14px;
+      font-size: 14px; font-weight: 600; cursor: pointer; transition: background .2s, color .2s;
+    }
+    .btn-secondary { background: #334155; color: #e2e8f0; }
+    .btn-secondary:hover { background: #475569; }
+    .btn-danger { background: #3f1d1d; color: #fca5a5; }
+    .btn-danger:hover { background: #7f1d1d; color: #fee2e2; }
+    .btn-secondary:disabled, .btn-danger:disabled {
+      background: #1e293b; color: #64748b; cursor: not-allowed;
+    }
 
     /* Play log */
     .log-section { background: #1e293b; border-radius: 12px; padding: 16px; }
@@ -129,6 +143,43 @@
     .summary-row:last-child { border-bottom: none; }
     .summary-label { color: #94a3b8; font-size: 14px; }
     .summary-value { color: #f1f5f9; font-size: 14px; font-weight: 600; }
+
+    .prefill-note {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+      text-align: left;
+    }
+    .prefill-note-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #e2e8f0;
+      margin-bottom: 4px;
+    }
+    .prefill-note-sub {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+    .prefill-note-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .prefill-btn {
+      background: #0f172a;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 9px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .prefill-btn:hover { background: #111827; }
   </style>
 </head>
 <body>
@@ -164,6 +215,15 @@
   <div id="step-2" class="setup-step">
     <h2>⚾ Set Lineups</h2>
     <p>Add player lineups (optional)</p>
+
+    <div class="prefill-note" id="prefill-note" style="display:none">
+      <div class="prefill-note-title" id="prefill-note-title">Team locked in</div>
+      <div class="prefill-note-sub" id="prefill-note-sub">Choose the opponent next, then adjust lineups.</div>
+      <div class="prefill-note-actions">
+        <button class="prefill-btn" type="button" onclick="focusOpponentSelect()">Choose Existing Opponent</button>
+        <button class="prefill-btn" type="button" onclick="focusOpponentInput()">Type New Opponent</button>
+      </div>
+    </div>
 
     <!-- Away Lineup -->
     <div class="lineup-editor">
@@ -228,7 +288,9 @@
 <div id="scorer-screen" style="display:none">
   <div class="header">
     <h1>⚾ <span id="game-title">Scoring</span></h1>
-    <span><span class="status-dot"></span><span id="status-label">Live</span></span>
+    <div class="header-actions">
+      <span><span class="status-dot" id="status-dot"></span><span id="status-label">Live</span></span>
+    </div>
   </div>
 
   <div class="scoreboard">
@@ -324,8 +386,9 @@
   <div class="input-section">
     <div class="input-label">
       <span>Describe the play</span>
+      <span>/fix count 2-1</span>
     </div>
-    <textarea id="play-input" placeholder='e.g. "Johnny singled, runner on second scored"' rows="3"></textarea>
+    <textarea id="play-input" placeholder='e.g. "Johnny singled, runner on second scored" or "/fix runner 3b->2b"' rows="3"></textarea>
     <div class="btn-row">
       <button class="btn-submit" id="submit-btn" onclick="submitPlay()">Submit Play</button>
       <button class="btn-undo" onclick="undoPlay()" title="Undo last play">↩</button>
@@ -360,6 +423,11 @@
     <div style="font-size:11px;color:#4ade80;margin-top:8px;">
       Game ID: <strong id="game-id-display" style="font-family:monospace;"></strong>
     </div>
+  </div>
+
+  <div class="session-actions">
+    <button class="btn-secondary" id="new-game-btn" onclick="startNewGame()">New Game</button>
+    <button class="btn-danger" id="end-game-btn" onclick="endGame()">End Game</button>
   </div>
 
   <div class="log-section">
@@ -413,9 +481,13 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
   const SUPABASE_URL = 'https://izddxiligsqzbnorcwlf.supabase.co';
   const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6ZGR4aWxpZ3NxemJub3Jjd2xmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTY2NTcsImV4cCI6MjA5MDM5MjY1N30.NMb5P8Iaxdc4TpuNhXbGwMyP7reL2ruvdlh-MUNJTdk';
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  const ACTIVE_GAME_STORAGE_KEY = 'gamestreamer.activeGameId';
+  const PREFILL_TEAM_STORAGE_KEY = 'gamestreamer.prefillTeam';
 
   let gameId = null;
   let gameState = null;
@@ -428,17 +500,46 @@
   let homeTeamId = null;
   let pendingAwayPlayers = [];
   let pendingHomePlayers = [];
+  let prefilledSide = null;
+
+  function persistActiveGame(id) {
+    if (!id) return;
+    localStorage.setItem(ACTIVE_GAME_STORAGE_KEY, id);
+    history.replaceState(null, '', `${location.pathname}?game=${encodeURIComponent(id)}`);
+  }
+
+  function clearActiveGame() {
+    localStorage.removeItem(ACTIVE_GAME_STORAGE_KEY);
+    history.replaceState(null, '', location.pathname);
+  }
+
+  function getRequestedGameId() {
+    const params = new URLSearchParams(location.search);
+    if (params.get('new') === '1') return null;
+    const fromUrl = params.get('game');
+    return fromUrl || localStorage.getItem(ACTIVE_GAME_STORAGE_KEY);
+  }
+
+  function showScorerScreen() {
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('scorer-screen').style.display = 'block';
+  }
 
   // ---------- Setup: Load Teams & Initialize ----------
   async function initSetupScreen() {
     await loadTeams();
+    await applyPrefilledTeamFromUrl();
     renderLineupRows('away');
     renderLineupRows('home');
   }
 
   async function loadTeams() {
     try {
-      const res = await fetch('/api/teams');
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) return; // scorer can still work without auth for now
+      const res = await fetch('/api/teams', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      });
       if (!res.ok) return;
       allTeams = await res.json();
       populateTeamSelects();
@@ -466,6 +567,138 @@
       opt2.textContent = team.name;
       homeSelect.appendChild(opt2);
     });
+  }
+
+  function applySelectedTeam(side, team) {
+    if (!team || !team.id) return;
+
+    const select = document.getElementById(`${side}-team-select`);
+    const nameInput = document.getElementById(`${side}-team-name`);
+
+    select.value = team.id;
+    nameInput.value = team.name || '';
+
+    if (side === 'away') {
+      awayTeamId = team.id;
+      pendingAwayPlayers = JSON.parse(JSON.stringify(team.players || []));
+      renderLineupRows('away');
+    } else {
+      homeTeamId = team.id;
+      pendingHomePlayers = JSON.parse(JSON.stringify(team.players || []));
+      renderLineupRows('home');
+    }
+  }
+
+  function consumePrefilledTeamFromStorage() {
+    try {
+      const raw = sessionStorage.getItem(PREFILL_TEAM_STORAGE_KEY);
+      if (!raw) return null;
+      sessionStorage.removeItem(PREFILL_TEAM_STORAGE_KEY);
+      return JSON.parse(raw);
+    } catch (error) {
+      sessionStorage.removeItem(PREFILL_TEAM_STORAGE_KEY);
+      return null;
+    }
+  }
+
+  function getPrefilledTeamFromUrl() {
+    try {
+      const params = new URLSearchParams(location.search);
+      const raw = params.get('prefill');
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (error) {
+      console.error('Invalid prefill payload in URL:', error);
+      return null;
+    }
+  }
+
+  function updatePrefillNote() {
+    const note = document.getElementById('prefill-note');
+    if (!note || !prefilledSide) {
+      if (note) note.style.display = 'none';
+      return;
+    }
+
+    const lockedTeamName = prefilledSide === 'away'
+      ? document.getElementById('away-team-name').value || 'Away team'
+      : document.getElementById('home-team-name').value || 'Home team';
+    const opponentLabel = prefilledSide === 'away' ? 'home' : 'away';
+
+    document.getElementById('prefill-note-title').textContent = `${lockedTeamName} is set as the ${prefilledSide} team`;
+    document.getElementById('prefill-note-sub').textContent = `Choose the ${opponentLabel} opponent next, then adjust lineups if needed.`;
+    note.style.display = 'block';
+  }
+
+  function focusOpponentSelect() {
+    if (!prefilledSide) return;
+    goToStep(1);
+    const target = prefilledSide === 'away' ? 'home-team-select' : 'away-team-select';
+    document.getElementById(target)?.focus();
+  }
+
+  function focusOpponentInput() {
+    if (!prefilledSide) return;
+    goToStep(1);
+    const target = prefilledSide === 'away' ? 'home-team-name' : 'away-team-name';
+    document.getElementById(target)?.focus();
+  }
+
+  async function applyPrefilledTeamFromUrl() {
+    const params = new URLSearchParams(location.search);
+    const side = params.get('side');
+    const teamId = params.get('team');
+
+    const urlPrefill = getPrefilledTeamFromUrl();
+    const storedPrefill = consumePrefilledTeamFromStorage();
+    const incomingPrefill = urlPrefill || storedPrefill;
+
+    if (incomingPrefill && ['away', 'home'].includes(incomingPrefill.side) && incomingPrefill.team?.id) {
+      const incomingTeam = incomingPrefill.team;
+      const existingIdx = allTeams.findIndex((entry) => entry.id === incomingTeam.id);
+
+      if (existingIdx >= 0) {
+        allTeams[existingIdx] = { ...allTeams[existingIdx], ...incomingTeam };
+      } else {
+        allTeams.push(incomingTeam);
+      }
+      populateTeamSelects();
+      applySelectedTeam(incomingPrefill.side, incomingTeam);
+      prefilledSide = incomingPrefill.side;
+      goToStep(2);
+      updatePrefillNote();
+      return;
+    }
+
+    if (!teamId || !['away', 'home'].includes(side)) return;
+
+    let team = allTeams.find((entry) => entry.id === teamId);
+
+    if (!team) {
+      try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) return;
+
+        const response = await fetch(`/api/teams/${encodeURIComponent(teamId)}`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (!response.ok) return;
+
+        team = await response.json();
+        allTeams.push(team);
+        populateTeamSelects();
+      } catch (error) {
+        console.error('Failed to prefill requested team:', error);
+        return;
+      }
+    }
+    applySelectedTeam(side, team);
+    prefilledSide = side;
+    goToStep(2);
+    updatePrefillNote();
   }
 
   function onAwayTeamChange() {
@@ -521,6 +754,7 @@
       const homeName = document.getElementById('home-team-name').value || 'Home Team';
       document.getElementById('away-lineup-title').textContent = `${awayName} Lineup`;
       document.getElementById('home-lineup-title').textContent = `${homeName} Lineup`;
+      updatePrefillNote();
     }
 
     if (n === 3) updateSummary();
@@ -649,6 +883,12 @@
     }
 
     try {
+      // Resolve session token once for all auth-gated requests in this flow
+      const { data: { session: gameSession } } = await supabaseClient.auth.getSession();
+      const authHeaders = gameSession
+        ? { 'Authorization': `Bearer ${gameSession.access_token}` }
+        : {};
+
       // 1. Create game
       const gameRes = await fetch('/api/games', {
         method: 'POST',
@@ -663,13 +903,14 @@
 
       gameId = gameData.id;
       gameState = gameData;
+      persistActiveGame(gameId);
 
       // 2. Save or create away team if needed
       let finalAwayTeamId = awayTeamId;
       if (!awayTeamId && awayName) {
         const teamRes = await fetch('/api/teams', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders },
           body: JSON.stringify({ name: awayName, players: pendingAwayPlayers })
         });
         const teamData = await teamRes.json();
@@ -681,7 +922,7 @@
       if (!homeTeamId && homeName) {
         const teamRes = await fetch('/api/teams', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders },
           body: JSON.stringify({ name: homeName, players: pendingHomePlayers })
         });
         const teamData = await teamRes.json();
@@ -706,8 +947,7 @@
       }
 
       // 5. Transition to scorer screen
-      document.getElementById('setup-screen').style.display = 'none';
-      document.getElementById('scorer-screen').style.display = 'block';
+      showScorerScreen();
       updateUI();
       await loadLineup();
       showShareBanner();
@@ -742,6 +982,37 @@
   function showShareBanner() {
     document.getElementById('game-id-display').textContent = gameId;
     document.getElementById('share-banner').style.display = 'block';
+  }
+
+  async function restoreActiveGame(id) {
+    try {
+      const res = await fetch(`/api/game/${id}/state`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        clearActiveGame();
+        showToast(data.error || 'Could not restore game', 'error');
+        return false;
+      }
+
+      gameId = id;
+      gameState = data;
+      persistActiveGame(id);
+      showScorerScreen();
+      updateUI();
+      await loadLineup();
+      showShareBanner();
+      if (gameState.status === 'final') {
+        showToast('Showing final game. Start a new game when ready.', 'success');
+      } else {
+        showToast('Restored active game', 'success');
+      }
+      return true;
+    } catch (e) {
+      clearActiveGame();
+      showToast('Could not restore saved game', 'error');
+      return false;
+    }
   }
 
   function getViewerUrl() {
@@ -783,8 +1054,16 @@
 
   // ---------- Submit Play ----------
   async function submitPlay() {
+    if (gameState?.status === 'final') {
+      showToast('This game is final. Start a new game to keep scoring.', 'error');
+      return;
+    }
+    const battingSideBeforePlay = gameState?.half === 'top' ? 'away' : 'home';
     const input = document.getElementById('play-input').value.trim();
     if (!input) return;
+    if (input.toLowerCase().startsWith('/fix ')) {
+      return submitFix(input.slice(5).trim());
+    }
     const btn = document.getElementById('submit-btn');
     btn.disabled = true;
     btn.innerHTML = '<span class="loading"></span>Parsing…';
@@ -798,16 +1077,20 @@
       const data = await res.json();
       if (!res.ok) return showToast(data.error, 'error');
 
-      gameState = data.game;
+      const previousPlays = gameState?.recent_plays ?? [];
+      gameState = {
+        ...(data.game || {}),
+        recent_plays: data.recent_play
+          ? [data.recent_play, ...previousPlays].slice(0, 10)
+          : previousPlays,
+      };
       document.getElementById('play-input').value = '';
       updateUI();
-      prependPlay({ raw_input: input, structured_play: data.play });
 
       // Advance batting order if play completed (not ball or strike)
       const completedPA = !['ball', 'strike'].includes(data.play.play_type);
       if (completedPA && lineupState) {
-        const battingSide = gameState.half === 'top' ? 'away' : 'home';
-        await advanceBatter(battingSide);
+        await advanceBatter(battingSideBeforePlay);
       }
 
       showToast('Play recorded ✓', 'success');
@@ -819,8 +1102,49 @@
     }
   }
 
+  async function submitFix(instruction) {
+    if (!instruction) {
+      showToast('Add a correction after /fix', 'error');
+      return;
+    }
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading"></span>Fixing…';
+
+    try {
+      const res = await fetch(`/api/game/${gameId}/fix`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instruction }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showToast(data.error, 'error');
+
+      const previousPlays = gameState?.recent_plays ?? [];
+      gameState = {
+        ...(data.game || {}),
+        recent_plays: data.recent_play
+          ? [data.recent_play, ...previousPlays].slice(0, 10)
+          : previousPlays,
+      };
+      document.getElementById('play-input').value = '';
+      updateUI();
+      showToast(data.summary || 'Correction applied ✓', 'success');
+    } catch (e) {
+      showToast('Network error — try again', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Submit Play';
+    }
+  }
+
   // ---------- Undo ----------
   async function undoPlay() {
+    if (gameState?.status === 'final') {
+      showToast('Final games cannot be edited', 'error');
+      return;
+    }
     if (!confirm('Undo last play?')) return;
     const res = await fetch(`/api/game/${gameId}/play`, { method: 'DELETE' });
     const data = await res.json();
@@ -836,12 +1160,21 @@
   // ---------- UI ----------
   function updateUI() {
     if (!gameState) return;
+    const isFinal = gameState.status === 'final';
     document.getElementById('away-name').textContent = gameState.away_team;
     document.getElementById('home-name').textContent = gameState.home_team;
     document.getElementById('game-title').textContent = `${gameState.away_team} @ ${gameState.home_team}`;
     document.getElementById('away-score').textContent = gameState.away_score;
     document.getElementById('home-score').textContent = gameState.home_score;
     document.getElementById('inning-display').textContent = ordinalInning(gameState.inning, gameState.half);
+    document.getElementById('status-label').textContent = isFinal ? 'Final' : 'Live';
+    document.getElementById('status-dot').classList.toggle('final', isFinal);
+    document.getElementById('submit-btn').disabled = isFinal;
+    document.getElementById('play-input').disabled = isFinal;
+    document.getElementById('play-input').placeholder = isFinal
+      ? 'Game is final'
+      : 'e.g. "Johnny singled, runner on second scored"';
+    document.getElementById('end-game-btn').disabled = isFinal;
 
     // Outs
     for (let i = 0; i < 3; i++) {
@@ -922,7 +1255,7 @@
     `).join('');
 
     // Update textarea placeholder
-    if (currentBatter && currentBatter.name) {
+    if (currentBatter && currentBatter.name && gameState?.status !== 'final') {
       document.getElementById('play-input').placeholder = `e.g. "${currentBatter.name} singled to left"`;
     }
   }
@@ -950,15 +1283,12 @@
     }
   }
 
-  function prependPlay(play) {
-    const log = document.getElementById('play-log');
-    log.insertAdjacentHTML('afterbegin', playHtml(play));
-  }
-
   function playHtml(p) {
     const type = p.structured_play?.play_type ?? '';
+    const summary = p.structured_play?.summary;
     return `<div class="play-item">
       <div class="play-raw"><span class="play-type-badge">${type}</span>${escHtml(p.raw_input)}</div>
+      ${summary ? `<div class="play-meta">${escHtml(summary)}</div>` : ''}
     </div>`;
   }
 
@@ -970,17 +1300,46 @@
   // ---------- Count ----------
   async function adjustCount(field, delta) {
     if (!gameId) return;
+    if (gameState?.status === 'final') {
+      showToast('Final games cannot be edited', 'error');
+      return;
+    }
+    const battingSideBeforePlay = gameState?.half === 'top' ? 'away' : 'home';
     const current = gameState?.[field] ?? 0;
-    const next = Math.max(0, Math.min(field === 'balls' ? 3 : 2, current + delta));
+    const limit = field === 'balls' ? 4 : 3;
+    const next = delta > 0
+      ? Math.min(limit, current + delta)
+      : Math.max(0, current + delta);
+    const previous = current;
     // Optimistic update
-    gameState[field] = next;
+    gameState[field] = Math.min(field === 'balls' ? 3 : 2, next);
     renderCount();
-    // Persist
-    await fetch(`/api/game/${gameId}/count`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: next }),
-    });
+    try {
+      const res = await fetch(`/api/game/${gameId}/count`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update count');
+      const previousPlays = gameState.recent_plays ?? [];
+      gameState = {
+        ...gameState,
+        ...(data.game || {}),
+        recent_plays: data.recent_play
+          ? [data.recent_play, ...previousPlays].slice(0, 10)
+          : previousPlays,
+      };
+      updateUI();
+      const completedPA = ['walk', 'strikeout'].includes(data.recent_play?.structured_play?.play_type);
+      if (completedPA && lineupState) {
+        await advanceBatter(battingSideBeforePlay);
+      }
+    } catch (e) {
+      gameState[field] = previous;
+      renderCount();
+      showToast('Failed to update count', 'error');
+    }
   }
 
   function renderCount() {
@@ -1014,9 +1373,51 @@
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  async function endGame() {
+    if (!gameId || gameState?.status === 'final') return;
+    if (!confirm('End this game and mark it final? You can still view it, but scoring will be locked.')) return;
+
+    try {
+      const res = await fetch(`/api/game/${gameId}/state`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'final' }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || 'Could not end game', 'error');
+        return;
+      }
+
+      gameState = {
+        ...gameState,
+        ...data,
+        recent_plays: gameState.recent_plays ?? [],
+      };
+      clearActiveGame();
+      updateUI();
+      showToast('Game ended. Scoring is now locked.', 'success');
+    } catch (e) {
+      showToast('Could not end game', 'error');
+    }
+  }
+
+  function startNewGame() {
+    if (gameState?.status !== 'final') {
+      const shouldLeave = confirm('Start a new game? Your current game will stay saved, and you can reopen it by link, but this scorer screen will reset.');
+      if (!shouldLeave) return;
+    }
+    clearActiveGame();
+    location.href = location.pathname;
+  }
+
   // Initialize on page load
   document.addEventListener('DOMContentLoaded', () => {
     initSetupScreen();
+    const requestedGameId = getRequestedGameId();
+    if (requestedGameId) {
+      restoreActiveGame(requestedGameId);
+    }
     document.getElementById('play-input')?.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitPlay(); }
     });
