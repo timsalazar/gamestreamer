@@ -15,6 +15,10 @@ export interface GameState {
   home_team: string;
   away_score: number;
   home_score: number;
+  away_hits?: number;
+  home_hits?: number;
+  away_errors?: number;
+  home_errors?: number;
   inning: number;
   half: 'top' | 'bottom';
   outs: number;

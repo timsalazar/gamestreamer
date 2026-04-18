@@ -25,7 +25,30 @@ export default async function handler(req, res) {
       .order('created_at', { ascending: false })
       .limit(10);
 
-    return res.status(200).json({ ...game, recent_plays: plays ?? [] });
+    const { data: allPlayFlags } = await supabaseAdmin
+      .from('plays')
+      .select('half, structured_play')
+      .eq('game_id', id);
+
+    const totals = (allPlayFlags ?? []).reduce(
+      (acc, play) => {
+        const battingTeam = play?.half === 'top' ? 'away' : 'home';
+        const fieldingTeam = battingTeam === 'away' ? 'home' : 'away';
+        if (play?.structured_play?.hit) acc[`${battingTeam}_hits`] += 1;
+        if (play?.structured_play?.error) acc[`${fieldingTeam}_errors`] += 1;
+        return acc;
+      },
+      { away_hits: 0, home_hits: 0, away_errors: 0, home_errors: 0 }
+    );
+
+    return res.status(200).json({
+      ...game,
+      away_hits: totals.away_hits,
+      home_hits: totals.home_hits,
+      away_errors: totals.away_errors,
+      home_errors: totals.home_errors,
+      recent_plays: plays ?? [],
+    });
   }
 
   // PATCH /api/game/[id]/state — update stream URL or status

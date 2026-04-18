@@ -17,28 +17,81 @@
     .video-wrap iframe, .video-wrap video { width: 100%; aspect-ratio: 16/9; display: block; }
     .no-stream { aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; color: #475569; font-size: 14px; }
 
-    /* ── Scoreboard rows ── */
-    .scoreboard { background: #1e293b; }
-    .score-row {
-      display: flex; align-items: center;
-      padding: 0 12px; height: 44px; gap: 10px;
+    /* ── Line score ── */
+    .scoreboard {
+      background: #000;
+      border-top: 1px solid #1e293b;
+      border-bottom: 1px solid #1e293b;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
     }
-    .score-row:first-child { border-bottom: 1px solid #0f172a; }
-    .score-row-label {
-      font-size: 11px; font-weight: 800; color: #fff;
-      text-transform: uppercase; letter-spacing: .04em;
-      min-width: 36px;
+    .line-score {
+      width: max-content;
+      min-width: 100%;
+      padding: 10px 12px;
     }
-    .score-row-name {
-      flex: 1; font-size: 13px; font-weight: 700; color: #e2e8f0;
-      text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    .ls-row { display: flex; align-items: center; }
+    .ls-row + .ls-row { margin-top: 8px; }
+    .ls-team {
+      width: 52px;
+      margin-right: 8px;
+      font-size: 22px;
+      font-weight: 900;
+      letter-spacing: .04em;
+      color: #f1f5f9;
+      text-transform: uppercase;
     }
-    .score-row-runs {
-      font-size: 26px; font-weight: 900; min-width: 28px; text-align: right;
+    .ls-team.muted { color: #94a3b8; }
+    .ls-cell {
+      width: 42px;
+      height: 34px;
+      margin-right: 6px;
+      border: 1px solid #7a7a7a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #f1f5f9;
+      font-size: 18px;
+      font-weight: 800;
       font-variant-numeric: tabular-nums;
     }
-    .away-runs { color: #60a5fa; }
-    .home-runs { color: #f87171; }
+    .ls-head {
+      border: none;
+      height: auto;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .ls-empty { color: transparent; }
+    .ls-current { background: #1f1f1f; }
+    .ls-sep {
+      width: 1px;
+      align-self: stretch;
+      background: #5e5e5e;
+      margin: 0 10px;
+    }
+    .ls-stat {
+      width: 34px;
+      margin-right: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: #f1f5f9;
+    }
+    .ls-stat-head {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .ls-stat-val {
+      margin-top: 8px;
+      font-size: 18px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
 
     /* ── Broadcast scorebug bar ── */
     .scorebug {
@@ -282,16 +335,55 @@
 
   function renderScoreboard() {
     const g = gameState;
+    const maxInning = Math.max(
+      g.inning ?? 1,
+      g.inning_scores?.top?.length ?? 0,
+      g.inning_scores?.bottom?.length ?? 0,
+      9
+    );
+    const innings = Array.from({ length: maxInning }, (_, i) => i + 1);
+
+    function teamAbbr(name) {
+      const words = String(name ?? '').trim().split(/\s+/).filter(Boolean);
+      if (words.length === 0) return 'TBD';
+      if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+      return words.slice(0, 2).map(word => word[0]).join('').toUpperCase();
+    }
+
+    function inningCell(half, inning) {
+      const val = g.inning_scores?.[half]?.[inning - 1];
+      const isCurrent = g.status === 'live' && g.half === half && g.inning === inning;
+      return `<div class="ls-cell${isCurrent ? ' ls-current' : ''}${val == null ? ' ls-empty' : ''}">${val == null ? '' : esc(String(val))}</div>`;
+    }
+
+    function statValue(value) {
+      return `<div class="ls-stat"><div class="ls-stat-val">${value}</div></div>`;
+    }
+
     document.getElementById('scoreboard').innerHTML = `
-      <div class="score-row">
-        <div class="score-row-label" style="color:#93c5fd;">Away</div>
-        <div class="score-row-name">${esc(g.away_team)}</div>
-        <div class="score-row-runs away-runs">${g.away_score}</div>
-      </div>
-      <div class="score-row">
-        <div class="score-row-label" style="color:#fca5a5;">Home</div>
-        <div class="score-row-name">${esc(g.home_team)}</div>
-        <div class="score-row-runs home-runs">${g.home_score}</div>
+      <div class="line-score">
+        <div class="ls-row">
+          <div class="ls-team"></div>
+          ${innings.map(inning => `<div class="ls-cell ls-head">${inning}</div>`).join('')}
+          <div class="ls-sep"></div>
+          ${['R', 'H', 'E'].map(label => `<div class="ls-stat"><div class="ls-stat-head">${label}</div></div>`).join('')}
+        </div>
+        <div class="ls-row">
+          <div class="ls-team">${esc(teamAbbr(g.away_team))}</div>
+          ${innings.map(inning => inningCell('top', inning)).join('')}
+          <div class="ls-sep"></div>
+          ${statValue(g.away_score ?? 0)}
+          ${statValue(g.away_hits ?? 0)}
+          ${statValue(g.away_errors ?? 0)}
+        </div>
+        <div class="ls-row">
+          <div class="ls-team muted">${esc(teamAbbr(g.home_team))}</div>
+          ${innings.map(inning => inningCell('bottom', inning)).join('')}
+          <div class="ls-sep"></div>
+          ${statValue(g.home_score ?? 0)}
+          ${statValue(g.home_hits ?? 0)}
+          ${statValue(g.home_errors ?? 0)}
+        </div>
       </div>
     `;
   }

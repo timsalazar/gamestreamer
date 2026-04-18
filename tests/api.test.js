@@ -2,7 +2,7 @@
  * API handler tests — Supabase and Claude are fully mocked.
  * We import handlers directly and drive them with fake req/res objects.
  */
-import { test, describe, before, mock } from 'node:test';
+import { test, describe, before, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 // ── Mock Supabase ──────────────────────────────────────────────────────────
@@ -36,6 +36,8 @@ function makeSupabaseClient() {
             return { data: null, error: { message: 'not found' } };
           },
           order: () => ({ limit: () => ({ data: mockPlays.filter(p => p.game_id === val), error: null }) }),
+          then: undefined,
+          data: table === 'plays' ? mockPlays.filter(p => p.game_id === val) : null,
         }),
         order: () => ({ limit: () => ({ data: [...mockGames.values()], error: null }) }),
       }),
@@ -178,6 +180,10 @@ function resetData() {
   mockPlays.length = 0;
 }
 
+beforeEach(() => {
+  resetData();
+});
+
 // ── Seed helper ────────────────────────────────────────────────────────────
 
 function seedGame(id = 'game-1', overrides = {}) {
@@ -225,11 +231,35 @@ describe('GET /api/game/:id/state', () => {
   test('returns game state for known game', async () => {
     resetData();
     seedGame('g-state-1');
+    mockPlays.push(
+      {
+        id: 'play-1',
+        game_id: 'g-state-1',
+        inning: 1,
+        half: 'top',
+        raw_input: 'single to left',
+        structured_play: { hit: true, error: false },
+        score_after: { away: 0, home: 0 },
+      },
+      {
+        id: 'play-2',
+        game_id: 'g-state-1',
+        inning: 1,
+        half: 'bottom',
+        raw_input: 'reached on error',
+        structured_play: { hit: false, error: true },
+        score_after: { away: 0, home: 0 },
+      }
+    );
     const req = makeReq('GET', { id: 'g-state-1' });
     const res = makeRes();
     await stateHandler(req, res);
     assert.equal(res._status, 200);
     assert.equal(res._body.id, 'g-state-1');
+    assert.equal(res._body.away_hits, 1);
+    assert.equal(res._body.home_hits, 0);
+    assert.equal(res._body.away_errors, 1);
+    assert.equal(res._body.home_errors, 0);
   });
 
   test('returns 404 for unknown game', async () => {

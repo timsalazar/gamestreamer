@@ -14,7 +14,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useGameState } from '../hooks/useGameState';
 import { Diamond } from '../components/Diamond';
 import { CountDots } from '../components/CountDots';
-import { ordinalInning } from '../lib/api';
+import { GameState } from '../lib/api';
 import { C } from '../lib/colors';
 
 // ── Video Player ──────────────────────────────────────────────────────────
@@ -104,6 +104,107 @@ const vp = StyleSheet.create({
 });
 
 // ── Scorebug ──────────────────────────────────────────────────────────────
+
+function teamAbbr(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return 'TBD';
+  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+  return words.slice(0, 2).map((word) => word[0]).join('').toUpperCase();
+}
+
+function LineScore({ state }: { state: GameState }) {
+  const maxInning = Math.max(
+    state.inning ?? 1,
+    state.inning_scores?.top?.length ?? 0,
+    state.inning_scores?.bottom?.length ?? 0,
+    9
+  );
+  const innings = Array.from({ length: maxInning }, (_, i) => i + 1);
+
+  function inningValue(half: 'top' | 'bottom', inning: number) {
+    return state.inning_scores?.[half]?.[inning - 1];
+  }
+
+  function statValue(value: number) {
+    return (
+      <View style={ls.statCell}>
+        <Text style={ls.statText}>{value}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={ls.scrollContent}
+      style={ls.wrap}
+    >
+      <View>
+        <View style={ls.headerRow}>
+          <View style={ls.teamCell} />
+          {innings.map((inning) => (
+            <View key={inning} style={ls.inningCell}>
+              <Text style={ls.headerText}>{inning}</Text>
+            </View>
+          ))}
+          <View style={ls.sep} />
+          {['R', 'H', 'E'].map((label) => (
+            <View key={label} style={ls.statCell}>
+              <Text style={ls.headerText}>{label}</Text>
+            </View>
+          ))}
+        </View>
+
+        {[
+          {
+            key: 'top' as const,
+            name: state.away_team,
+            runs: state.away_score ?? 0,
+            hits: state.away_hits ?? 0,
+            errors: state.away_errors ?? 0,
+            accent: C.text,
+          },
+          {
+            key: 'bottom' as const,
+            name: state.home_team,
+            runs: state.home_score ?? 0,
+            hits: state.home_hits ?? 0,
+            errors: state.home_errors ?? 0,
+            accent: C.textMuted,
+          },
+        ].map((row) => (
+          <View key={row.key} style={ls.dataRow}>
+            <View style={ls.teamCell}>
+              <Text style={[ls.teamAbbr, { color: row.accent }]}>{teamAbbr(row.name)}</Text>
+            </View>
+            {innings.map((inning) => {
+              const value = inningValue(row.key, inning);
+              const isCurrent =
+                state.status === 'live' &&
+                state.half === row.key &&
+                state.inning === inning;
+              return (
+                <View
+                  key={inning}
+                  style={[ls.inningCell, isCurrent && ls.currentCell]}
+                >
+                  <Text style={[ls.inningText, value == null && ls.emptyText]}>
+                    {value == null ? '' : String(value)}
+                  </Text>
+                </View>
+              );
+            })}
+            <View style={ls.sep} />
+            {statValue(row.runs)}
+            {statValue(row.hits)}
+            {statValue(row.errors)}
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
 
 function Scorebug({
   inning,
@@ -369,19 +470,7 @@ export default function ViewerScreen() {
       {/* Video */}
       <VideoPlayer url={state.stream_url} />
 
-      {/* Scoreboard rows */}
-      <View style={vw.scoreboard}>
-        {[
-          { label: 'Away', team: state.away_team, score: state.away_score, color: C.blueLight },
-          { label: 'Home', team: state.home_team, score: state.home_score, color: C.red },
-        ].map((row) => (
-          <View key={row.label} style={vw.scoreRow}>
-            <Text style={[vw.rowLabel, { color: row.color }]}>{row.label}</Text>
-            <Text style={vw.rowTeam}>{row.team}</Text>
-            <Text style={[vw.rowScore, { color: row.color }]}>{row.score}</Text>
-          </View>
-        ))}
-      </View>
+      <LineScore state={state} />
 
       {/* Scorebug */}
       <Scorebug
@@ -429,33 +518,6 @@ const vw = StyleSheet.create({
   errorText: { color: C.red, fontSize: 16, marginBottom: 16, textAlign: 'center' },
   retryText: { color: C.blueLight, fontSize: 14 },
 
-  scoreboard: { backgroundColor: C.surface },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    height: 44,
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: C.bg,
-  },
-  rowLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    minWidth: 36,
-  },
-  rowTeam: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '700',
-    color: C.textSub,
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-  },
-  rowScore: { fontSize: 26, fontWeight: '900' },
-
   feed: { flex: 1, padding: 16 },
   feedTitle: {
     fontSize: 11,
@@ -489,4 +551,83 @@ const vw = StyleSheet.create({
   },
   playText: { fontSize: 14, color: C.textSub },
   playScore: { fontSize: 11, color: C.textFaint, marginTop: 2 },
+});
+
+const ls = StyleSheet.create({
+  wrap: {
+    backgroundColor: '#000',
+    borderTopWidth: 1,
+    borderTopColor: C.borderDim,
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderDim,
+  },
+  scrollContent: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  dataRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  teamCell: {
+    width: 52,
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  teamAbbr: {
+    fontSize: 22,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  inningCell: {
+    width: 42,
+    height: 34,
+    borderWidth: 1,
+    borderColor: '#7a7a7a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+  },
+  currentCell: {
+    backgroundColor: '#1f1f1f',
+  },
+  headerText: {
+    color: C.text,
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  inningText: {
+    color: C.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  emptyText: {
+    color: 'transparent',
+  },
+  sep: {
+    width: 1,
+    alignSelf: 'stretch',
+    backgroundColor: '#5e5e5e',
+    marginHorizontal: 10,
+  },
+  statCell: {
+    width: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  statText: {
+    color: C.text,
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 8,
+  },
 });
