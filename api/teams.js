@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../lib/supabase.js';
+import { isMissingTableError, supabaseAdmin } from '../lib/supabase.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -13,7 +13,10 @@ export default async function handler(req, res) {
       .select('id, name, players')
       .order('name', { ascending: true });
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      if (isMissingTableError(error)) return res.status(200).json([]);
+      return res.status(500).json({ error: error.message });
+    }
     return res.status(200).json(data);
   }
 
@@ -30,6 +33,14 @@ export default async function handler(req, res) {
       .select()
       .single();
 
+    if (error && isMissingTableError(error)) {
+      return res.status(202).json({
+        id: null,
+        name: name.trim(),
+        players: players || [],
+        warning: 'teams_table_missing',
+      });
+    }
     if (error) return res.status(500).json({ error: error.message });
     return res.status(201).json(data);
   }

@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '../../../lib/supabase.js';
+import { isMissingTableError, supabaseAdmin } from '../../../lib/supabase.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,7 +15,12 @@ export default async function handler(req, res) {
       .select('id, game_id, side, team_id, players, current_batter_index')
       .eq('game_id', id);
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      if (isMissingTableError(error)) {
+        return res.status(200).json({ home: null, away: null });
+      }
+      return res.status(500).json({ error: error.message });
+    }
 
     // Return as object with home and away keys
     const result = { home: null, away: null };
@@ -53,6 +58,17 @@ export default async function handler(req, res) {
       .select()
       .single();
 
+    if (error && isMissingTableError(error)) {
+      return res.status(202).json({
+        id: null,
+        game_id: id,
+        side,
+        team_id: team_id || null,
+        players,
+        current_batter_index: 0,
+        warning: 'game_lineups_table_missing',
+      });
+    }
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json(data);
   }
@@ -77,6 +93,15 @@ export default async function handler(req, res) {
       .select()
       .single();
 
+    if (error && isMissingTableError(error)) {
+      return res.status(202).json({
+        id: null,
+        game_id: id,
+        side,
+        current_batter_index,
+        warning: 'game_lineups_table_missing',
+      });
+    }
     if (error) return res.status(500).json({ error: error.message });
     if (!data) return res.status(404).json({ error: 'Lineup not found' });
 

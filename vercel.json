@@ -1,6 +1,13 @@
 {
   "buildCommand": "npm run build-vercel",
   "public": "public",
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/index.html",
+      "permanent": false
+    }
+  ],
   "headers": [
     {
       "source": "/api/(.*)",

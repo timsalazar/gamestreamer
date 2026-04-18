@@ -160,7 +160,18 @@
           `<div class="connecting">Game <strong>${esc(gameId)}</strong> not found.</div>`;
         return false;
       }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        let message = `Unable to load game (HTTP ${res.status})`;
+        try {
+          const body = await res.json();
+          if (body?.error) message = body.error;
+        } catch {}
+        if (!gameState) {
+          document.getElementById('app').innerHTML =
+            `<div class="connecting">${esc(message)}</div>`;
+        }
+        return false;
+      }
       const data = await res.json();
 
       const isFirstLoad = !gameState;
@@ -179,6 +190,10 @@
       return true;
     } catch (err) {
       console.error('Poll error:', err);
+      if (!gameState) {
+        document.getElementById('app').innerHTML =
+          '<div class="connecting">Could not reach the local server. Check that it is still running.</div>';
+      }
       return gameState != null; // keep showing stale data if we had any
     }
   }
