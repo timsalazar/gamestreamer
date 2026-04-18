@@ -119,5 +119,21 @@
 
   </div>
 
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    // Auth redirect: send logged-in users to /teams.html, unauthenticated to /login.html
+    (async () => {
+      const SUPABASE_URL = 'https://izddxiligsqzbnorcwlf.supabase.co';
+      const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6ZGR4aWxpZ3NxemJub3Jjd2xmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTY2NTcsImV4cCI6MjA5MDM5MjY1N30.NMb5P8Iaxdc4TpuNhXbGwMyP7reL2ruvdlh-MUNJTdk';
+      const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) {
+        window.location.replace('/teams.html');
+      } else {
+        window.location.replace('/login.html');
+      }
+    })();
+  </script>
 </body>
 </html>

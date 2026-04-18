@@ -41,10 +41,29 @@ export default async function handler(req, res) {
       });
     }
 
-    // 3a. If it's a single pitch (ball or strike), just update the count and return early
+    // 3a. If it's a single pitch (ball or strike), log it and update the count
     if (structuredPlay.play_type === 'ball' || structuredPlay.play_type === 'strike') {
       const newBalls   = Math.min(3, (game.balls   ?? 0) + (structuredPlay.balls_delta   ?? 0));
       const newStrikes = Math.min(2, (game.strikes ?? 0) + (structuredPlay.strikes_delta ?? 0));
+      const loggedPlay = {
+        ...structuredPlay,
+        count_after: { balls: newBalls, strikes: newStrikes },
+      };
+
+      const { data: insertedPlay, error: playErr } = await supabaseAdmin
+        .from('plays')
+        .insert({
+          game_id: id,
+          inning: game.inning,
+          half: game.half,
+          raw_input: raw_input.trim(),
+          structured_play: loggedPlay,
+          score_after: { home: game.home_score, away: game.away_score },
+        })
+        .select()
+        .single();
+
+      if (playErr) return res.status(500).json({ error: playErr.message });
 
       const { data: updatedGame, error: updateErr } = await supabaseAdmin
         .from('games')
@@ -54,7 +73,7 @@ export default async function handler(req, res) {
         .single();
 
       if (updateErr) return res.status(500).json({ error: updateErr.message });
-      return res.status(200).json({ game: updatedGame, play: structuredPlay });
+      return res.status(200).json({ game: updatedGame, play: loggedPlay, recent_play: insertedPlay });
     }
 
     // 3. Validate the parsed play
@@ -68,16 +87,23 @@ export default async function handler(req, res) {
 
     // 4. Apply play to game state
     const newState = applyPlay(game, structuredPlay);
+    const loggedPlay = {
+      ...structuredPlay,
+      count_after: { balls: newState.balls, strikes: newState.strikes },
+    };
 
     // 5. Save play log
-    const { error: playErr } = await supabaseAdmin.from('plays').insert({
-      game_id: id,
-      inning: game.inning,
-      half: game.half,
-      raw_input: raw_input.trim(),
-      structured_play: structuredPlay,
-      score_after: { home: newState.home_score, away: newState.away_score },
-    });
+    const { data: insertedPlay, error: playErr } = await supabaseAdmin.from('plays')
+      .insert({
+        game_id: id,
+        inning: game.inning,
+        half: game.half,
+        raw_input: raw_input.trim(),
+        structured_play: loggedPlay,
+        score_after: { home: newState.home_score, away: newState.away_score },
+      })
+      .select()
+      .single();
 
     if (playErr) return res.status(500).json({ error: playErr.message });
 
@@ -104,7 +130,8 @@ export default async function handler(req, res) {
 
     return res.status(200).json({
       game: updatedGame,
-      play: structuredPlay,
+      play: loggedPlay,
+      recent_play: insertedPlay,
     });
   }
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,13 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { createClient } from '@supabase/supabase-js';
 import { C } from '../lib/colors';
+
+const SUPABASE_URL = 'https://izddxiligsqzbnorcwlf.supabase.co';
+const SUPABASE_ANON =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6ZGR4aWxpZ3NxemJub3Jjd2xmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTY2NTcsImV4cCI6MjA5MDM5MjY1N30.NMb5P8Iaxdc4TpuNhXbGwMyP7reL2ruvdlh-MUNJTdk';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
 
 interface Card {
   icon: string;
@@ -47,6 +53,15 @@ const CARDS: Card[] = [
 
 export default function HomeScreen() {
   const router = useRouter();
+
+  // Redirect authenticated users to the teams screen
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        router.replace('/teams');
+      }
+    });
+  }, [router]);
 
   return (
     <ScrollView contentContainerStyle={s.container}>

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team Details — GameStreamer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      min-height: 100vh;
+    }
+
+    .page {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 20px 16px 48px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .back-link {
+      color: #60a5fa;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .back-link:hover { color: #93c5fd; }
+
+    .signout-btn {
+      background: #1e293b;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .signout-btn:hover { background: #334155; }
+
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .team-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .team-name {
+      font-size: 28px;
+      font-weight: 800;
+      letter-spacing: -.02em;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .badge-owner { background: #14532d; color: #4ade80; }
+    .badge-shared { background: #1e3a5f; color: #60a5fa; }
+
+    .meta {
+      color: #94a3b8;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      border-radius: 12px;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      transition: background .15s, transform .1s;
+    }
+    .action-btn:hover { transform: translateY(-1px); }
+    .action-btn-primary { background: #2563eb; color: white; }
+    .action-btn-primary:hover { background: #1d4ed8; }
+    .action-btn-secondary {
+      background: #0f172a;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+    }
+    .action-btn-secondary:hover { background: #111827; }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: #94a3b8;
+      margin-bottom: 14px;
+    }
+
+    .roster-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .player-row {
+      display: grid;
+      grid-template-columns: 48px 1fr auto auto;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 14px;
+      border-radius: 12px;
+      background: #0f172a;
+      border: 1px solid #243244;
+    }
+
+    .order-pill {
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #1d4ed8;
+      color: white;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .player-name {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .player-pos,
+    .player-num {
+      font-size: 13px;
+      font-weight: 700;
+      color: #cbd5e1;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 6px 10px;
+      min-width: 48px;
+      text-align: center;
+      background: #111827;
+    }
+
+    .placeholder,
+    .error-banner {
+      border-radius: 14px;
+      padding: 18px 20px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .placeholder {
+      background: #111827;
+      border: 1px dashed #334155;
+      color: #94a3b8;
+    }
+
+    .error-banner {
+      display: none;
+      background: #3f1d1d;
+      border: 1px solid #7f1d1d;
+      color: #fecaca;
+      margin-bottom: 16px;
+    }
+    .error-banner.visible { display: block; }
+
+    @media (max-width: 640px) {
+      .player-row {
+        grid-template-columns: 40px 1fr;
+      }
+
+      .player-pos,
+      .player-num {
+        justify-self: start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="topbar">
+      <a href="/teams.html" class="back-link">← Back to teams</a>
+      <button class="signout-btn" onclick="signOut()">Sign Out</button>
+    </div>
+
+    <div class="error-banner" id="error-banner"></div>
+
+    <section class="card" id="team-card" style="display:none">
+      <div class="team-title">
+        <h1 class="team-name" id="team-name">Team</h1>
+        <span class="badge badge-owner" id="team-role">Owner</span>
+      </div>
+      <div class="meta" id="team-meta"></div>
+      <div class="action-row">
+        <a href="#" class="action-btn action-btn-primary" id="start-away-link">Start New Game as Away</a>
+        <a href="#" class="action-btn action-btn-secondary" id="start-home-link">Start New Game as Home</a>
+      </div>
+    </section>
+
+    <section class="card" id="roster-card" style="display:none">
+      <div class="section-title">Roster</div>
+      <div class="roster-list" id="roster-list"></div>
+    </section>
+
+    <div class="placeholder" id="loading-state">Loading team…</div>
+    <div class="placeholder" id="empty-state" style="display:none">This team does not have any players yet.</div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://izddxiligsqzbnorcwlf.supabase.co';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6ZGR4aWxpZ3NxemJub3Jjd2xmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4MTY2NTcsImV4cCI6MjA5MDM5MjY1N30.NMb5P8Iaxdc4TpuNhXbGwMyP7reL2ruvdlh-MUNJTdk';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+    function escHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function showError(message) {
+      const banner = document.getElementById('error-banner');
+      banner.textContent = message;
+      banner.classList.add('visible');
+      document.getElementById('loading-state').style.display = 'none';
+    }
+
+    function setVisible(id, visible) {
+      document.getElementById(id).style.display = visible ? 'block' : 'none';
+    }
+
+    function formatCount(count) {
+      return count === 1 ? '1 player' : `${count} players`;
+    }
+
+    function setStartLinks(team) {
+      const awayLink = document.getElementById('start-away-link');
+      const homeLink = document.getElementById('start-home-link');
+      const encodedId = encodeURIComponent(team.id);
+      const awayPayload = encodeURIComponent(JSON.stringify({
+        side: 'away',
+        team: {
+          id: team.id,
+          name: team.name,
+          players: Array.isArray(team.players) ? team.players : [],
+        },
+      }));
+      const homePayload = encodeURIComponent(JSON.stringify({
+        side: 'home',
+        team: {
+          id: team.id,
+          name: team.name,
+          players: Array.isArray(team.players) ? team.players : [],
+        },
+      }));
+
+      awayLink.href = `/scorer.html?new=1&side=away&team=${encodedId}&prefill=${awayPayload}`;
+      homeLink.href = `/scorer.html?new=1&side=home&team=${encodedId}&prefill=${homePayload}`;
+
+      awayLink.onclick = (event) => {
+        event.preventDefault();
+        sessionStorage.setItem('gamestreamer.prefillTeam', JSON.stringify({
+          side: 'away',
+          team: {
+            id: team.id,
+            name: team.name,
+            players: Array.isArray(team.players) ? team.players : [],
+          },
+        }));
+        window.location.href = awayLink.href;
+      };
+
+      homeLink.onclick = (event) => {
+        event.preventDefault();
+        sessionStorage.setItem('gamestreamer.prefillTeam', JSON.stringify({
+          side: 'home',
+          team: {
+            id: team.id,
+            name: team.name,
+            players: Array.isArray(team.players) ? team.players : [],
+          },
+        }));
+        window.location.href = homeLink.href;
+      };
+    }
+
+    function renderTeam(team) {
+      document.title = `${team.name} — GameStreamer`;
+      document.getElementById('team-name').textContent = team.name;
+
+      const role = team.role === 'owner' ? 'Owner' : 'Shared';
+      const roleEl = document.getElementById('team-role');
+      roleEl.textContent = role;
+      roleEl.className = `badge ${team.role === 'owner' ? 'badge-owner' : 'badge-shared'}`;
+
+      const players = Array.isArray(team.players) ? [...team.players] : [];
+      players.sort((a, b) => (a.batting_order || 999) - (b.batting_order || 999));
+
+      document.getElementById('team-meta').textContent = formatCount(players.length);
+      setStartLinks({ ...team, players });
+
+      setVisible('loading-state', false);
+      setVisible('team-card', true);
+
+      if (players.length === 0) {
+        setVisible('empty-state', true);
+        setVisible('roster-card', false);
+        return;
+      }
+
+      const roster = document.getElementById('roster-list');
+      roster.innerHTML = players.map((player, index) => `
+        <div class="player-row">
+          <div class="order-pill">${escHtml(player.batting_order || index + 1)}</div>
+          <div class="player-name">${escHtml(player.name || 'Unnamed player')}</div>
+          <div class="player-pos">${escHtml(player.position || '—')}</div>
+          <div class="player-num">${escHtml(player.number || '—')}</div>
+        </div>
+      `).join('');
+
+      setVisible('empty-state', false);
+      setVisible('roster-card', true);
+    }
+
+    async function signOut() {
+      await supabaseClient.auth.signOut();
+      window.location.href = '/login.html';
+    }
+
+    async function init() {
+      const params = new URLSearchParams(window.location.search);
+      const teamId = params.get('id');
+
+      if (!teamId) {
+        showError('Missing team id.');
+        return;
+      }
+
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) {
+        window.location.href = '/login.html';
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/teams/${encodeURIComponent(teamId)}`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        const payload = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          showError(payload.error || `Failed to load team (${response.status}).`);
+          return;
+        }
+
+        renderTeam(payload);
+      } catch (error) {
+        showError('Network error while loading team. Please refresh.');
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
