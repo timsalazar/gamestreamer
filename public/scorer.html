@@ -1079,7 +1079,6 @@
       showToast('This game is final. Start a new game to keep scoring.', 'error');
       return;
     }
-    const battingSideBeforePlay = gameState?.half === 'top' ? 'away' : 'home';
     const input = document.getElementById('play-input').value.trim();
     if (!input) return;
     if (input.toLowerCase().startsWith('/fix ')) {
@@ -1108,16 +1107,9 @@
       document.getElementById('play-input').value = '';
       updateUI();
 
-      // Advance batting order if play completed (not ball or strike)
-      const completedPA = !['ball', 'strike'].includes(data.play.play_type);
-      console.log(`[submitPlay] completedPA=${completedPA}, play_type=${data.play.play_type}, hasLineup=${!!lineupState}`);
-      console.log(`[submitPlay] gameState.half=${gameState?.half}, currentBatter=${lineupState?.[battingSideBeforePlay]?.current_batter?.name}`);
-
-      if (completedPA && lineupState) {
-        console.log(`[submitPlay] Calling advanceBatter for ${battingSideBeforePlay}`);
-        await advanceBatter(battingSideBeforePlay);
-      } else if (!completedPA) {
-        console.log(`[submitPlay] Not advancing - play_type=${data.play.play_type} is pitch or incomplete`);
+      // Completed at-bats advance the lineup on the server in /api/game/:id/play.
+      if (lineupState) {
+        await loadLineup();
       }
 
       showToast('Play recorded ✓', 'success');

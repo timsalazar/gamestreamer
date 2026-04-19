@@ -192,55 +192,27 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'current_batter_index must be a non-negative number' });
     }
 
-    // Update the games table with the batter index (will fail silently if column doesn't exist)
-    const updatePayload = side === 'away'
-      ? { away_batter_index: current_batter_index }
-      : { home_batter_index: current_batter_index };
-
-    const { error: updateErr } = await supabaseAdmin
-      .from('games')
-      .update(updatePayload)
-      .eq('id', id);
-
-    if (updateErr) {
-      console.warn(`[lineup PATCH] Could not update batter index (column may not exist):`, updateErr.message);
-    } else {
-      console.log(`[lineup PATCH] Updated ${side} batter index to ${current_batter_index}`);
-    }
-
-    // Fetch the updated game and team data to return enriched response
-    const { data: game } = await supabaseAdmin
-      .from('games')
-      .select('away_team, home_team')
-      .eq('id', id)
+    const { data, error } = await supabaseAdmin
+      .from('game_lineups')
+      .update({ current_batter_index })
+      .eq('game_id', id)
+      .eq('side', side)
+      .select()
       .single();
 
-    const teamNameKey = side === 'away' ? game?.away_team : game?.home_team;
-    if (teamNameKey) {
-      const { data: team } = await supabaseAdmin
-        .from('teams')
-        .select('id, name, players')
-        .eq('name', teamNameKey)
-        .single();
-
-      if (team && Array.isArray(team.players) && team.players.length > 0) {
-        return res.status(200).json(enrichLineup({
-          id: null,
-          game_id: id,
-          side,
-          team_id: team.id,
-          players: [],
-          current_batter_index,
-        }, { [team.id]: team.players }));
-      }
+    if (error && isMissingTableError(error)) {
+      return res.status(202).json({
+        id: null,
+        game_id: id,
+        side,
+        current_batter_index,
+        warning: 'game_lineups_table_missing',
+      });
     }
+    if (error) return res.status(500).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: 'Lineup not found' });
 
-    return res.status(200).json({
-      id: null,
-      game_id: id,
-      side,
-      current_batter_index,
-    });
+    return res.status(200).json(enrichLineup(data));
   }
 
   res.status(405).json({ error: 'Method not allowed' });
