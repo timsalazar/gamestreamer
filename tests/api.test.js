@@ -270,6 +270,26 @@ describe('GET /api/game/:id/state', () => {
     assert.equal(res._status, 404);
   });
 
+  test('derives hits from hit play types even when hit flag is missing', async () => {
+    resetData();
+    seedGame('g-state-2');
+    mockPlays.push({
+      id: 'play-3',
+      game_id: 'g-state-2',
+      inning: 1,
+      half: 'top',
+      raw_input: 'double to the gap',
+      structured_play: { play_type: 'double', error: false },
+      score_after: { away: 0, home: 0 },
+    });
+    const req = makeReq('GET', { id: 'g-state-2' });
+    const res = makeRes();
+    await stateHandler(req, res);
+    assert.equal(res._status, 200);
+    assert.equal(res._body.away_hits, 1);
+    assert.equal(res._body.home_hits, 0);
+  });
+
 });
 
 // ── Tests: PATCH /api/game/:id/state ──────────────────────────────────────

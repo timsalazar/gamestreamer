@@ -1,5 +1,24 @@
 import { supabaseAdmin } from '../../../lib/supabase.js';
 
+function isHitPlay(structuredPlay) {
+  if (!structuredPlay) return false;
+  if (structuredPlay.hit === true) return true;
+  if (typeof structuredPlay.hit === 'string' && structuredPlay.hit.toLowerCase() === 'true') {
+    return true;
+  }
+
+  return ['single', 'double', 'triple', 'home_run'].includes(structuredPlay.play_type);
+}
+
+function isErrorPlay(structuredPlay) {
+  if (!structuredPlay) return false;
+  if (structuredPlay.error === true) return true;
+  if (typeof structuredPlay.error === 'string' && structuredPlay.error.toLowerCase() === 'true') {
+    return true;
+  }
+  return structuredPlay.play_type === 'error';
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, PATCH, OPTIONS');
@@ -34,8 +53,8 @@ export default async function handler(req, res) {
       (acc, play) => {
         const battingTeam = play?.half === 'top' ? 'away' : 'home';
         const fieldingTeam = battingTeam === 'away' ? 'home' : 'away';
-        if (play?.structured_play?.hit) acc[`${battingTeam}_hits`] += 1;
-        if (play?.structured_play?.error) acc[`${fieldingTeam}_errors`] += 1;
+        if (isHitPlay(play?.structured_play)) acc[`${battingTeam}_hits`] += 1;
+        if (isErrorPlay(play?.structured_play)) acc[`${fieldingTeam}_errors`] += 1;
         return acc;
       },
       { away_hits: 0, home_hits: 0, away_errors: 0, home_errors: 0 }
