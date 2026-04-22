@@ -2,6 +2,52 @@ import { supabaseAdmin } from '../../../lib/supabase.js';
 import { parsePlay } from '../../../lib/claude.js';
 import { applyPlay, validatePlay } from '../../../lib/game-logic.js';
 
+async function getEffectivePlayers(gameId, side) {
+  const { data: lineup, error } = await supabaseAdmin
+    .from('game_lineups')
+    .select('players, team_id')
+    .eq('game_id', gameId)
+    .eq('side', side)
+    .single();
+
+  if (error || !lineup) {
+    return [];
+  }
+
+  const players = Array.isArray(lineup.players) ? [...lineup.players] : [];
+  if (players.length > 0) return players;
+
+  if (!lineup.team_id) return [];
+
+  const { data: team } = await supabaseAdmin
+    .from('teams')
+    .select('players')
+    .eq('id', lineup.team_id)
+    .single();
+
+  return Array.isArray(team?.players) ? team.players : [];
+}
+
+async function inferPitcher(gameId, side) {
+  const players = await getEffectivePlayers(gameId, side);
+  const pitcher = players.find((player) => player?.position === 'P' && player?.name);
+  if (pitcher?.name) return pitcher.name;
+
+  const { data: previousPitchingPlay } = await supabaseAdmin
+    .from('plays')
+    .select('structured_play')
+    .eq('game_id', gameId)
+    .eq('half', side === 'home' ? 'top' : 'bottom')
+    .order('created_at', { ascending: false })
+    .limit(25);
+
+  const priorPitcher = (previousPitchingPlay ?? [])
+    .map((play) => play?.structured_play?.pitcher)
+    .find(Boolean);
+
+  return priorPitcher ?? null;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, DELETE, OPTIONS');
@@ -125,6 +171,16 @@ export default async function handler(req, res) {
         } else {
           console.log(`[play] No players available after all lookups`);
         }
+      }
+    }
+
+    // 2c. If pitcher is missing, fill it from the defensive lineup's P slot.
+    if (!structuredPlay.pitcher) {
+      const defensiveSide = game.half === 'top' ? 'home' : 'away';
+      const inferredPitcher = await inferPitcher(id, defensiveSide);
+      if (inferredPitcher) {
+        structuredPlay.pitcher = inferredPitcher;
+        console.log(`[play] Inferred pitcher for ${defensiveSide}: "${inferredPitcher}"`);
       }
     }
 

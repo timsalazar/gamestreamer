@@ -344,6 +344,14 @@
       color: #e2e8f0;
       background: rgba(255,255,255,0.02);
     }
+    .pitcher-row td {
+      background: rgba(245, 158, 11, 0.08);
+      color: #f8fafc;
+    }
+    .pitcher-row td.name {
+      color: #fde68a;
+      font-weight: 700;
+    }
     .play-feed {
       padding: 16px;
       background: #111827;
@@ -718,7 +726,7 @@
     for (const p of plays) {
       const sp = p?.structured_play;
       if (!sp) continue;
-      const batter = sp.batter;
+      const batter = sp.batter || (sp.runners ?? []).find((runner) => runner.from === 'home')?.name || 'Unknown';
       if (batter) {
         const s = get(batter);
         if (['single', 'double', 'triple', 'home_run', 'strikeout', 'groundout', 'flyout', 'fielders_choice', 'error', 'bunt', 'other'].includes(sp.play_type)) s.ab++;
@@ -736,15 +744,74 @@
     return stats;
   }
 
+  function computePitching(plays, fallbackPitcher = null) {
+    const stats = new Map();
+
+    function get(name) {
+      const key = name || 'Unknown';
+      if (!stats.has(key)) {
+        stats.set(key, { ip_outs: 0, h: 0, r: 0, er: 0, bb: 0, so: 0 });
+      }
+      return stats.get(key);
+    }
+
+    for (const p of plays) {
+      const sp = p?.structured_play;
+      if (!sp || sp.play_type === 'ball' || sp.play_type === 'strike') continue;
+      const pitcher = sp.pitcher || fallbackPitcher;
+      if (!pitcher) continue;
+      const s = get(pitcher);
+
+      if (sp.outs_recorded) s.ip_outs += sp.outs_recorded;
+      if (sp.hit === true || ['single', 'double', 'triple', 'home_run'].includes(sp.play_type)) s.h++;
+      if (sp.play_type === 'walk') s.bb++;
+      if (sp.play_type === 'strikeout') s.so++;
+      if (sp.runs_scored) {
+        s.r += sp.runs_scored;
+        const unearned = sp.unearned_runs ?? 0;
+        s.er += sp.runs_scored - unearned;
+      }
+    }
+
+    return stats;
+  }
+
   function formatAVG(h, ab) {
     if (!ab) return '.---';
     return '.' + String(Math.round((h / ab) * 1000)).padStart(3, '0');
+  }
+
+  function formatIP(outs) {
+    const full = Math.floor((outs ?? 0) / 3);
+    const partial = (outs ?? 0) % 3;
+    return `${full}.${partial}`;
+  }
+
+  function formatERA(er, ipOuts) {
+    if (!ipOuts) return '-.--';
+    return ((er * 27) / ipOuts).toFixed(2);
+  }
+
+  function getTeamPitching(side) {
+    const defenseHalf = side === 'away' ? 'bottom' : 'top';
+    const plays = [...allPlays].reverse().filter((p) => p.half === defenseHalf);
+    const recentPitcher = [...plays].reverse().map((p) => p?.structured_play?.pitcher).find(Boolean) ?? null;
+    const lineupPitcher = (lineupState?.[side]?.effective_players ?? []).find((player) => player?.position === 'P' && player?.name)?.name ?? null;
+    const currentPitcher = recentPitcher ?? lineupPitcher;
+    const stats = computePitching(plays, currentPitcher);
+
+    if (currentPitcher && !stats.has(currentPitcher)) {
+      stats.set(currentPitcher, { ip_outs: 0, h: 0, r: 0, er: 0, bb: 0, so: 0 });
+    }
+
+    return { stats, currentPitcher };
   }
 
   function lineupRows(side) {
     const lineup = lineupState?.[side];
     const plays = [...allPlays].reverse().filter((p) => p.half === (side === 'away' ? 'top' : 'bottom'));
     const stats = computeBatting(plays);
+    const { currentPitcher } = getTeamPitching(side);
     const players = Array.isArray(lineup?.effective_players) && lineup.effective_players.length
       ? lineup.effective_players
       : [...stats.keys()].map((name, index) => ({ batting_order: index + 1, name, position: '' }));
@@ -773,6 +840,31 @@
         <td>${formatAVG(s.h, s.ab)}</td>
       </tr>`;
     }).join('');
+    const playerNames = new Set(players.map((player) => player?.name).filter(Boolean));
+    const statOnlyRows = [...stats.entries()].filter(([name]) => !playerNames.has(name)).map(([name, s]) => {
+      totals.ab += s.ab; totals.r += s.r; totals.h += s.h; totals.rbi += s.rbi; totals.bb += s.bb; totals.so += s.so;
+      return `<tr>
+        <td class="order"></td>
+        <td class="name">${esc(name)}</td>
+        <td class="pos"></td>
+        <td>${s.ab}</td>
+        <td>${s.r}</td>
+        <td>${s.h}</td>
+        <td>${s.rbi}</td>
+        <td>${s.bb}</td>
+        <td>${s.so}</td>
+        <td>${formatAVG(s.h, s.ab)}</td>
+      </tr>`;
+    }).join('');
+    const hasPitcherInPlayers = currentPitcher && players.some((player) => player?.name === currentPitcher);
+    const pitcherRow = currentPitcher && !hasPitcherInPlayers
+      ? `<tr class="pitcher-row">
+        <td></td>
+        <td class="name">${esc(currentPitcher)}<span class="current-chip">Pitcher</span></td>
+        <td class="pos">P</td>
+        <td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>.---</td>
+      </tr>`
+      : '';
 
     return `<table class="lineup-table">
       <thead>
@@ -783,12 +875,45 @@
       </thead>
       <tbody>
         ${body}
+        ${statOnlyRows}
+        ${pitcherRow}
         <tr class="totals-row">
           <td></td><td class="name">Totals</td><td class="pos"></td>
           <td>${totals.ab}</td><td>${totals.r}</td><td>${totals.h}</td><td>${totals.rbi}</td><td>${totals.bb}</td><td>${totals.so}</td><td></td>
         </tr>
       </tbody>
     </table>`;
+  }
+
+  function buildPitchingCard(teamName, side, isHome) {
+    const { stats, currentPitcher } = getTeamPitching(side);
+    const rows = [...stats.entries()].map(([name, s]) => {
+      const isCurrent = currentPitcher && name === currentPitcher;
+      return `<tr${isCurrent ? ' class="pitcher-row"' : ''}>
+        <td class="name">${esc(name)}${isCurrent ? '<span class="current-chip">Pitcher</span>' : ''}</td>
+        <td>${formatIP(s.ip_outs)}</td>
+        <td>${s.h}</td>
+        <td>${s.r}</td>
+        <td>${s.er}</td>
+        <td>${s.bb}</td>
+        <td>${s.so}</td>
+        <td>${formatERA(s.er, s.ip_outs)}</td>
+      </tr>`;
+    }).join('');
+
+    const body = rows || `<tr><td class="no-data" colspan="8">No pitching data yet</td></tr>`;
+
+    return `
+      <div class="team-band${isHome ? ' home' : ''}">${esc(teamName)}</div>
+      <table class="lineup-table">
+        <thead>
+          <tr>
+            <th style="text-align:left">Pitcher</th><th>IP</th><th>H</th><th>R</th><th>ER</th><th>BB</th><th>SO</th><th>ERA</th>
+          </tr>
+        </thead>
+        <tbody>${body}</tbody>
+      </table>
+    `;
   }
 
   function renderBoxScoreSidebar() {
@@ -849,6 +974,15 @@
         ${lineupRows('away')}
         <div class="team-band home">${esc(gameState.home_team)}</div>
         ${lineupRows('home')}
+      </div>
+
+      <div class="panel-card lineup-card">
+        <div class="panel-head">
+          <div class="panel-title">Pitching</div>
+          <div class="panel-meta">Viewer Stats</div>
+        </div>
+        ${buildPitchingCard(gameState.away_team, 'away', false)}
+        ${buildPitchingCard(gameState.home_team, 'home', true)}
       </div>
     `;
   }

@@ -25,6 +25,18 @@ function enrichLineup(lineup, teamPlayersById = {}) {
   };
 }
 
+async function getTeamPlayers(teamId) {
+  if (!teamId) return [];
+
+  const { data: team } = await supabaseAdmin
+    .from('teams')
+    .select('players')
+    .eq('id', teamId)
+    .single();
+
+  return Array.isArray(team?.players) ? team.players : [];
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
@@ -150,6 +162,8 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'players must be an array' });
     }
 
+    const effectivePlayers = players.length > 0 ? players : await getTeamPlayers(team_id);
+
     // Upsert: if a lineup exists for this game+side, replace it
     const { data, error } = await supabaseAdmin
       .from('game_lineups')
@@ -157,7 +171,7 @@ export default async function handler(req, res) {
         game_id: id,
         side,
         team_id: team_id || null,
-        players,
+        players: effectivePlayers,
         current_batter_index: 0,
       }, {
         onConflict: 'game_id,side'
@@ -171,7 +185,7 @@ export default async function handler(req, res) {
         game_id: id,
         side,
         team_id: team_id || null,
-        players,
+        players: effectivePlayers,
         current_batter_index: 0,
         warning: 'game_lineups_table_missing',
       });

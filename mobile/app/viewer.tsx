@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useGameState } from '../hooks/useGameState';
 import { Diamond } from '../components/Diamond';
 import { CountDots } from '../components/CountDots';
-import { GameState } from '../lib/api';
+import { api, GameLineups, GameState, Play } from '../lib/api';
 import { C } from '../lib/colors';
 
 // ── Video Player ──────────────────────────────────────────────────────────
@@ -368,6 +368,156 @@ const sb = StyleSheet.create({
   statusText: { color: C.textFaint, fontSize: 11, fontWeight: '700' },
 });
 
+function computePitching(plays: Play[], fallbackPitcher: string | null = null) {
+  const stats = new Map<string, { ip_outs: number; h: number; r: number; er: number; bb: number; so: number }>();
+
+  function get(name: string) {
+    if (!stats.has(name)) {
+      stats.set(name, { ip_outs: 0, h: 0, r: 0, er: 0, bb: 0, so: 0 });
+    }
+    return stats.get(name)!;
+  }
+
+  for (const play of plays) {
+    const sp = play.structured_play;
+    if (!sp || sp.play_type === 'ball' || sp.play_type === 'strike') continue;
+    const pitcher = sp.pitcher || fallbackPitcher;
+    if (!pitcher) continue;
+    const s = get(pitcher);
+    if (sp.outs_recorded) s.ip_outs += sp.outs_recorded;
+    if (sp.hit === true || ['single', 'double', 'triple', 'home_run'].includes(sp.play_type)) s.h++;
+    if (sp.play_type === 'walk') s.bb++;
+    if (sp.play_type === 'strikeout') s.so++;
+    if (sp.runs_scored) {
+      s.r += sp.runs_scored;
+      s.er += sp.runs_scored - (sp.unearned_runs ?? 0);
+    }
+  }
+
+  return stats;
+}
+
+function formatIP(outs: number) {
+  return `${Math.floor(outs / 3)}.${outs % 3}`;
+}
+
+function formatERA(er: number, ipOuts: number) {
+  if (!ipOuts) return '-.--';
+  return ((er * 27) / ipOuts).toFixed(2);
+}
+
+function getTeamPitching(plays: Play[], lineup: GameLineups | null, side: 'away' | 'home') {
+  const defenseHalf = side === 'away' ? 'bottom' : 'top';
+  const defensivePlays = [...plays].reverse().filter((play) => play.half === defenseHalf);
+  const recentPitcher = [...defensivePlays].reverse().map((play) => play.structured_play?.pitcher).find(Boolean) ?? null;
+  const lineupPitcher =
+    lineup?.[side]?.effective_players?.find((player) => player?.position === 'P' && player?.name)?.name ?? null;
+  const currentPitcher = recentPitcher ?? lineupPitcher;
+  const stats = computePitching(defensivePlays, currentPitcher);
+
+  if (currentPitcher && !stats.has(currentPitcher)) {
+    stats.set(currentPitcher, { ip_outs: 0, h: 0, r: 0, er: 0, bb: 0, so: 0 });
+  }
+
+  return { stats, currentPitcher };
+}
+
+function PitchingCard({
+  teamName,
+  plays,
+  lineup,
+  side,
+}: {
+  teamName: string;
+  plays: Play[];
+  lineup: GameLineups | null;
+  side: 'away' | 'home';
+}) {
+  const { stats, currentPitcher } = getTeamPitching(plays, lineup, side);
+  const rows = [...stats.entries()];
+
+  return (
+    <View style={pc.card}>
+      <View style={pc.header}>
+        <Text style={pc.label}>{teamName}</Text>
+        <Text style={pc.meta}>{currentPitcher ? `P: ${currentPitcher}` : 'Pitching'}</Text>
+      </View>
+      <View style={pc.tableHead}>
+        {['Pitcher', 'IP', 'H', 'R', 'ER', 'BB', 'SO', 'ERA'].map((label, index) => (
+          <Text key={label} style={[pc.headText, index === 0 ? pc.nameCol : pc.numCol]}>
+            {label}
+          </Text>
+        ))}
+      </View>
+      {rows.length === 0 ? (
+        <Text style={pc.empty}>No pitching data yet</Text>
+      ) : (
+        rows.map(([name, s]) => {
+          const isCurrent = currentPitcher === name;
+          return (
+            <View key={name} style={[pc.row, isCurrent && pc.currentRow]}>
+              <Text style={[pc.cellText, pc.nameCol, isCurrent && pc.currentText]}>
+                {name}
+              </Text>
+              <Text style={[pc.cellText, pc.numCol]}>{formatIP(s.ip_outs)}</Text>
+              <Text style={[pc.cellText, pc.numCol]}>{s.h}</Text>
+              <Text style={[pc.cellText, pc.numCol]}>{s.r}</Text>
+              <Text style={[pc.cellText, pc.numCol]}>{s.er}</Text>
+              <Text style={[pc.cellText, pc.numCol]}>{s.bb}</Text>
+              <Text style={[pc.cellText, pc.numCol]}>{s.so}</Text>
+              <Text style={[pc.cellText, pc.numCol]}>{formatERA(s.er, s.ip_outs)}</Text>
+            </View>
+          );
+        })
+      )}
+    </View>
+  );
+}
+
+const pc = StyleSheet.create({
+  card: {
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  label: { color: C.text, fontSize: 14, fontWeight: '700' },
+  meta: { color: C.textDim, fontSize: 11, fontWeight: '600' },
+  tableHead: {
+    flexDirection: 'row',
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderDim,
+    marginBottom: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.borderDim,
+  },
+  currentRow: { backgroundColor: '#1d2a3a', borderRadius: 8 },
+  headText: {
+    color: C.textFaint,
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  cellText: { color: C.textSub, fontSize: 12, fontWeight: '600' },
+  currentText: { color: C.text },
+  nameCol: { flex: 2.4, paddingRight: 6 },
+  numCol: { flex: 1, textAlign: 'center' },
+  empty: { color: C.textFaint, fontSize: 13, textAlign: 'center', paddingVertical: 10 },
+});
+
 // ── Game ID Entry ─────────────────────────────────────────────────────────
 
 function GameIdEntry({ onSubmit }: { onSubmit: (id: string) => void }) {
@@ -439,6 +589,35 @@ export default function ViewerScreen() {
     params.game ?? null
   );
   const { state, error } = useGameState(activeId);
+  const [plays, setPlays] = useState<Play[]>([]);
+  const [lineup, setLineup] = useState<GameLineups | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadViewerData() {
+      if (!activeId) return;
+      try {
+        const [nextPlays, nextLineup] = await Promise.all([
+          api.getPlays(activeId),
+          api.getLineup(activeId).catch(() => null),
+        ]);
+        if (!cancelled) {
+          setPlays(nextPlays);
+          setLineup(nextLineup);
+        }
+      } catch {
+        if (!cancelled) setPlays([]);
+      }
+    }
+
+    loadViewerData();
+    const timer = setInterval(loadViewerData, state?.status === 'final' ? 10000 : 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [activeId, state?.status]);
 
   if (!activeId) {
     return <GameIdEntry onSubmit={setActiveId} />;
@@ -485,6 +664,10 @@ export default function ViewerScreen() {
 
       {/* Play feed */}
       <ScrollView style={vw.feed}>
+        <Text style={vw.feedTitle}>Pitching</Text>
+        <PitchingCard teamName={state.away_team} plays={plays} lineup={lineup} side="away" />
+        <PitchingCard teamName={state.home_team} plays={plays} lineup={lineup} side="home" />
+
         <Text style={vw.feedTitle}>Play by Play</Text>
         {(state.recent_plays ?? []).length === 0 ? (
           <Text style={vw.noPlays}>Waiting for first play…</Text>

@@ -11,12 +11,14 @@ import assert from 'node:assert/strict';
 const mockGames = new Map();
 const mockPlays = [];
 const mockLineups = [];
+const mockTeams = [];
 
 function makeSupabaseClient() {
   function rowsFor(table) {
     if (table === 'games') return [...mockGames.values()];
     if (table === 'plays') return mockPlays;
     if (table === 'game_lineups') return mockLineups;
+    if (table === 'teams') return mockTeams;
     return [];
   }
 
@@ -88,6 +90,23 @@ function makeSupabaseClient() {
             else if (table === 'game_lineups') mockLineups.push(newRow);
             else mockPlays.push(newRow);
             return { data: newRow, error: null };
+          },
+        }),
+      }),
+      upsert: (row) => ({
+        select: () => ({
+          single: () => {
+            if (table !== 'game_lineups') {
+              return { data: null, error: { message: 'unsupported upsert' } };
+            }
+
+            const index = mockLineups.findIndex((existing) =>
+              existing.game_id === row.game_id && existing.side === row.side
+            );
+            const nextRow = { ...row, id: row.id ?? mockLineups[index]?.id ?? 'test-' + Date.now() };
+            if (index >= 0) mockLineups[index] = nextRow;
+            else mockLineups.push(nextRow);
+            return { data: nextRow, error: null };
           },
         }),
       }),
@@ -208,6 +227,7 @@ function resetData() {
   mockGames.clear();
   mockPlays.length = 0;
   mockLineups.length = 0;
+  mockTeams.length = 0;
 }
 
 beforeEach(() => {
@@ -382,6 +402,31 @@ describe('PATCH /api/game/:id/lineup', () => {
     assert.equal(mockLineups[0].current_batter_index, 1);
     assert.equal(res._body.current_batter?.name, 'Bea');
     assert.equal(res._body.on_deck?.name, 'Alice');
+  });
+
+});
+
+describe('POST /api/game/:id/lineup', () => {
+
+  test('backfills players from selected team when client sends an empty lineup', async () => {
+    seedGame('g-lineup-2');
+    mockTeams.push({
+      id: 'team-2',
+      players: [
+        { name: 'Nia', batting_order: 1, position: 'SS' },
+        { name: 'Ola', batting_order: 2, position: 'P' },
+      ],
+    });
+
+    const req = makeReq('POST', { id: 'g-lineup-2' }, { side: 'away', team_id: 'team-2', players: [] });
+    const res = makeRes();
+    await lineupHandler(req, res);
+
+    assert.equal(res._status, 200);
+    assert.equal(mockLineups[0].players.length, 2);
+    assert.equal(mockLineups[0].players[0].name, 'Nia');
+    assert.equal(res._body.current_batter?.name, 'Nia');
+    assert.equal(res._body.on_deck?.name, 'Ola');
   });
 
 });

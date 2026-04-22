@@ -589,6 +589,38 @@
     }
   }
 
+  async function fetchTeamDetails(teamId) {
+    if (!teamId) return null;
+    const cached = allTeams.find((team) => team.id === teamId);
+    if (cached && Array.isArray(cached.players) && cached.players.length > 0) {
+      return cached;
+    }
+
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) return cached ?? null;
+
+      const response = await fetch(`/api/teams/${encodeURIComponent(teamId)}`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      if (!response.ok) return cached ?? null;
+
+      const team = await response.json();
+      const existingIdx = allTeams.findIndex((entry) => entry.id === team.id);
+      if (existingIdx >= 0) {
+        allTeams[existingIdx] = { ...allTeams[existingIdx], ...team };
+      } else {
+        allTeams.push(team);
+      }
+      return team;
+    } catch (error) {
+      console.error('Failed to fetch team details:', error);
+      return cached ?? null;
+    }
+  }
+
   function consumePrefilledTeamFromStorage() {
     try {
       const raw = sessionStorage.getItem(PREFILL_TEAM_STORAGE_KEY);
@@ -701,13 +733,13 @@
     updatePrefillNote();
   }
 
-  function onAwayTeamChange() {
+  async function onAwayTeamChange() {
     const select = document.getElementById('away-team-select');
     const nameInput = document.getElementById('away-team-name');
 
     if (select.value) {
       // Existing team selected
-      const team = allTeams.find(t => t.id === select.value);
+      const team = await fetchTeamDetails(select.value);
       if (team) {
         nameInput.value = team.name;
         awayTeamId = team.id;
@@ -722,13 +754,13 @@
     renderLineupRows('away');
   }
 
-  function onHomeTeamChange() {
+  async function onHomeTeamChange() {
     const select = document.getElementById('home-team-select');
     const nameInput = document.getElementById('home-team-name');
 
     if (select.value) {
       // Existing team selected
-      const team = allTeams.find(t => t.id === select.value);
+      const team = await fetchTeamDetails(select.value);
       if (team) {
         nameInput.value = team.name;
         homeTeamId = team.id;
