@@ -12,3 +12,6 @@ node_modules/
 # OS
 .DS_Store
 .vercel
+
+# Supabase local temp files
+supabase/.temp/

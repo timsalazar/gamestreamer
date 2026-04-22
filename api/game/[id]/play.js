@@ -2,6 +2,52 @@ import { supabaseAdmin } from '../../../lib/supabase.js';
 import { parsePlay } from '../../../lib/claude.js';
 import { applyPlay, validatePlay } from '../../../lib/game-logic.js';
 
+async function getEffectivePlayers(gameId, side) {
+  const { data: lineup, error } = await supabaseAdmin
+    .from('game_lineups')
+    .select('players, team_id')
+    .eq('game_id', gameId)
+    .eq('side', side)
+    .single();
+
+  if (error || !lineup) {
+    return [];
+  }
+
+  const players = Array.isArray(lineup.players) ? [...lineup.players] : [];
+  if (players.length > 0) return players;
+
+  if (!lineup.team_id) return [];
+
+  const { data: team } = await supabaseAdmin
+    .from('teams')
+    .select('players')
+    .eq('id', lineup.team_id)
+    .single();
+
+  return Array.isArray(team?.players) ? team.players : [];
+}
+
+async function inferPitcher(gameId, side) {
+  const players = await getEffectivePlayers(gameId, side);
+  const pitcher = players.find((player) => player?.position === 'P' && player?.name);
+  if (pitcher?.name) return pitcher.name;
+
+  const { data: previousPitchingPlay } = await supabaseAdmin
+    .from('plays')
+    .select('structured_play')
+    .eq('game_id', gameId)
+    .eq('half', side === 'home' ? 'top' : 'bottom')
+    .order('created_at', { ascending: false })
+    .limit(25);
+
+  const priorPitcher = (previousPitchingPlay ?? [])
+    .map((play) => play?.structured_play?.pitcher)
+    .find(Boolean);
+
+  return priorPitcher ?? null;
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, DELETE, OPTIONS');
@@ -14,6 +60,7 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const { raw_input } = req.body;
     if (!raw_input?.trim()) {
+      console.error('[play] Missing raw_input in request body');
       return res.status(400).json({ error: 'raw_input is required' });
     }
 
@@ -24,8 +71,14 @@ export default async function handler(req, res) {
       .eq('id', id)
       .single();
 
-    if (gameErr || !game) return res.status(404).json({ error: 'Game not found' });
-    if (game.status === 'final') return res.status(400).json({ error: 'Game is already final' });
+    if (gameErr || !game) {
+      console.error(`[play] Game ${id} not found:`, gameErr?.message);
+      return res.status(404).json({ error: 'Game not found' });
+    }
+    if (game.status === 'final') {
+      console.error(`[play] Game ${id} is already final`);
+      return res.status(400).json({ error: 'Game is already final' });
+    }
 
     // 2. Call Claude to parse the play
     let structuredPlay;
@@ -35,10 +88,100 @@ export default async function handler(req, res) {
       );
       structuredPlay = await Promise.race([parsePlay(raw_input, game), timeoutPromise]);
     } catch (err) {
+      console.error(`[play] Claude parse error for game ${id}:`, err.message);
       return res.status(503).json({
         error: 'Could not parse that play. Try rephrasing.',
         detail: err.message,
       });
+    }
+
+    // Auto-correct: if runs_scored > 0 but no runners moving to H, zero it out
+    const runnersToH = structuredPlay.runners.filter(r => r.to === 'H').length;
+    if (structuredPlay.runs_scored > 0 && runnersToH === 0) {
+      console.warn(`[play] Auto-correcting: runs_scored was ${structuredPlay.runs_scored} but no runners moved to H, setting to 0`);
+      structuredPlay.runs_scored = 0;
+      structuredPlay.rbi = 0;
+    }
+
+    // 2b. If batter is null, fill in from current lineup
+    if (!structuredPlay.batter) {
+      const side = game.half === 'top' ? 'away' : 'home';
+      console.log(`[play] Attempting to populate batter for game ${id}, side=${side}`);
+
+      const { data: lineup, error: lineupErr } = await supabaseAdmin
+        .from('game_lineups')
+        .select('players, current_batter_index, team_id')
+        .eq('game_id', id)
+        .eq('side', side)
+        .single();
+
+      if (lineupErr) {
+        console.warn(`[play] Error querying game_lineups: ${lineupErr.message}`);
+      }
+
+      if (!lineup) {
+        console.log(`[play] No lineup found in game_lineups table for game ${id}, side=${side}`);
+      } else {
+        console.log(`[play] Found lineup:`, {
+          playersCount: lineup.players?.length ?? 0,
+          currentBatterIndex: lineup.current_batter_index,
+          teamId: lineup.team_id
+        });
+
+        const playerList = Array.isArray(lineup.players) && lineup.players.length > 0 ? lineup.players : [];
+        console.log(`[play] Player list length: ${playerList.length}`);
+
+        // If no explicit players, fetch from team
+        if (playerList.length === 0 && lineup.team_id) {
+          console.log(`[play] No players in lineup, fetching from teams table for team_id=${lineup.team_id}`);
+          const { data: team, error: teamErr } = await supabaseAdmin
+            .from('teams')
+            .select('players')
+            .eq('id', lineup.team_id)
+            .single();
+
+          if (teamErr) {
+            console.warn(`[play] Error querying teams table: ${teamErr.message}`);
+          }
+
+          if (!team) {
+            console.log(`[play] No team found with id=${lineup.team_id}`);
+          } else if (!team.players) {
+            console.log(`[play] Team found but has no players field`);
+          } else if (!Array.isArray(team.players)) {
+            console.log(`[play] Team.players exists but is not an array: ${typeof team.players}`);
+          } else {
+            console.log(`[play] Adding ${team.players.length} players from team roster`);
+            playerList.push(...team.players);
+          }
+        }
+
+        if (playerList.length > 0) {
+          const currentIndex = (lineup.current_batter_index ?? 0) % playerList.length;
+          const currentBatter = playerList[currentIndex];
+          console.log(`[play] Using index ${currentIndex} for batter from ${playerList.length} players`);
+          console.log(`[play] Current batter object:`, currentBatter);
+
+          if (currentBatter?.name) {
+            structuredPlay.batter = currentBatter.name;
+            console.log(`[play] Successfully set batter to "${currentBatter.name}"`);
+          } else {
+            console.log(`[play] Selected player has no name property`);
+          }
+        } else {
+          console.log(`[play] No players available after all lookups`);
+        }
+      }
+    }
+
+    // 2c. If pitcher is missing, fill it from the defensive lineup's P slot.
+    if (!structuredPlay.pitcher) {
+      const defensiveSide = game.half === 'top' ? 'home' : 'away';
+      const inferredPitcher = await inferPitcher(id, defensiveSide);
+      if (inferredPitcher) {
+        structuredPlay.pitcher = inferredPitcher;
+        console.log(`[play] Inferred pitcher for ${defensiveSide}: "${inferredPitcher}"`);
+      }
     }
 
     // 3a. If it's a single pitch (ball or strike), log it and update the count
@@ -63,7 +206,10 @@ export default async function handler(req, res) {
         .select()
         .single();
 
-      if (playErr) return res.status(500).json({ error: playErr.message });
+      if (playErr) {
+        console.error(`[play] Error inserting play for game ${id}:`, playErr.message);
+        return res.status(500).json({ error: playErr.message });
+      }
 
       const { data: updatedGame, error: updateErr } = await supabaseAdmin
         .from('games')
@@ -72,13 +218,18 @@ export default async function handler(req, res) {
         .select()
         .single();
 
-      if (updateErr) return res.status(500).json({ error: updateErr.message });
+      if (updateErr) {
+        console.error(`[play] Error updating game ${id} (pitch):`, updateErr.message);
+        return res.status(500).json({ error: updateErr.message });
+      }
       return res.status(200).json({ game: updatedGame, play: loggedPlay, recent_play: insertedPlay });
     }
 
     // 3. Validate the parsed play
     const validation = validatePlay(game, structuredPlay);
     if (!validation.valid) {
+      console.error(`[play] Validation failed for game ${id}:`, validation.reason);
+      console.error('[play] Structured play:', JSON.stringify(structuredPlay));
       return res.status(422).json({
         error: `Play validation failed: ${validation.reason}`,
         structured_play: structuredPlay,
@@ -105,7 +256,43 @@ export default async function handler(req, res) {
       .select()
       .single();
 
-    if (playErr) return res.status(500).json({ error: playErr.message });
+    if (playErr) {
+      console.error(`[play] Error inserting play for game ${id}:`, playErr.message);
+      return res.status(500).json({ error: playErr.message });
+    }
+
+    // 5.5. Advance batter if at-bat is over
+    const ATBAT_ENDERS = ['single', 'double', 'triple', 'home_run', 'strikeout', 'groundout', 'flyout', 'fielders_choice', 'error', 'walk', 'hit_by_pitch', 'bunt', 'sacrifice_fly'];
+    if (ATBAT_ENDERS.includes(structuredPlay.play_type)) {
+      const batterSide = game.half === 'top' ? 'away' : 'home';
+      console.log(`[play] At-bat ended for ${batterSide} (play_type: ${structuredPlay.play_type}), advancing batter index`);
+
+      const { data: lineup, error: lineupErr } = await supabaseAdmin
+        .from('game_lineups')
+        .select('current_batter_index, players')
+        .eq('game_id', id)
+        .eq('side', batterSide)
+        .single();
+
+      if (!lineupErr && lineup) {
+        const playerCount = Array.isArray(lineup.players) && lineup.players.length > 0
+          ? lineup.players.length
+          : 9; // Default to 9 if no players stored
+
+        const nextIndex = ((lineup.current_batter_index ?? 0) + 1) % playerCount;
+        const { error: updateLineupErr } = await supabaseAdmin
+          .from('game_lineups')
+          .update({ current_batter_index: nextIndex })
+          .eq('game_id', id)
+          .eq('side', batterSide);
+
+        if (updateLineupErr) {
+          console.warn(`[play] Could not advance batter index for ${batterSide}:`, updateLineupErr.message);
+        } else {
+          console.log(`[play] Advanced ${batterSide} batter index from ${lineup.current_batter_index ?? 0} to ${nextIndex}`);
+        }
+      }
+    }
 
     // 6. Update game state
     const { data: updatedGame, error: updateErr } = await supabaseAdmin
@@ -126,7 +313,10 @@ export default async function handler(req, res) {
       .select()
       .single();
 
-    if (updateErr) return res.status(500).json({ error: updateErr.message });
+    if (updateErr) {
+      console.error(`[play] Error updating game ${id}:`, updateErr.message);
+      return res.status(500).json({ error: updateErr.message });
+    }
 
     return res.status(200).json({
       game: updatedGame,

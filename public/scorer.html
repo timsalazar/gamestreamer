@@ -589,6 +589,38 @@
     }
   }
 
+  async function fetchTeamDetails(teamId) {
+    if (!teamId) return null;
+    const cached = allTeams.find((team) => team.id === teamId);
+    if (cached && Array.isArray(cached.players) && cached.players.length > 0) {
+      return cached;
+    }
+
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) return cached ?? null;
+
+      const response = await fetch(`/api/teams/${encodeURIComponent(teamId)}`, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+      if (!response.ok) return cached ?? null;
+
+      const team = await response.json();
+      const existingIdx = allTeams.findIndex((entry) => entry.id === team.id);
+      if (existingIdx >= 0) {
+        allTeams[existingIdx] = { ...allTeams[existingIdx], ...team };
+      } else {
+        allTeams.push(team);
+      }
+      return team;
+    } catch (error) {
+      console.error('Failed to fetch team details:', error);
+      return cached ?? null;
+    }
+  }
+
   function consumePrefilledTeamFromStorage() {
     try {
       const raw = sessionStorage.getItem(PREFILL_TEAM_STORAGE_KEY);
@@ -701,13 +733,13 @@
     updatePrefillNote();
   }
 
-  function onAwayTeamChange() {
+  async function onAwayTeamChange() {
     const select = document.getElementById('away-team-select');
     const nameInput = document.getElementById('away-team-name');
 
     if (select.value) {
       // Existing team selected
-      const team = allTeams.find(t => t.id === select.value);
+      const team = await fetchTeamDetails(select.value);
       if (team) {
         nameInput.value = team.name;
         awayTeamId = team.id;
@@ -722,13 +754,13 @@
     renderLineupRows('away');
   }
 
-  function onHomeTeamChange() {
+  async function onHomeTeamChange() {
     const select = document.getElementById('home-team-select');
     const nameInput = document.getElementById('home-team-name');
 
     if (select.value) {
       // Existing team selected
-      const team = allTeams.find(t => t.id === select.value);
+      const team = await fetchTeamDetails(select.value);
       if (team) {
         nameInput.value = team.name;
         homeTeamId = team.id;
@@ -872,6 +904,24 @@
     document.getElementById('summary-home-lineup').textContent = pendingHomePlayers.length > 0 ? `${pendingHomePlayers.length} players` : 'Not set';
   }
 
+  function clonePlayers(players) {
+    return JSON.parse(JSON.stringify(Array.isArray(players) ? players : []));
+  }
+
+  function resolveLineupPlayers(side) {
+    const pending = side === 'away' ? pendingAwayPlayers : pendingHomePlayers;
+    if (Array.isArray(pending) && pending.length > 0) return clonePlayers(pending);
+
+    const selectedTeamId = side === 'away' ? awayTeamId : homeTeamId;
+    const selectedTeamName = document.getElementById(`${side}-team-name`).value.trim();
+    const selectedTeam = allTeams.find((team) =>
+      (selectedTeamId && team.id === selectedTeamId) ||
+      (selectedTeamName && team.name === selectedTeamName)
+    );
+
+    return clonePlayers(selectedTeam?.players);
+  }
+
   async function startGame() {
     const awayName = document.getElementById('away-team-name').value.trim();
     const homeName = document.getElementById('home-team-name').value.trim();
@@ -883,6 +933,9 @@
     }
 
     try {
+      const awayLineupPlayers = resolveLineupPlayers('away');
+      const homeLineupPlayers = resolveLineupPlayers('home');
+
       // Resolve session token once for all auth-gated requests in this flow
       const { data: { session: gameSession } } = await supabaseClient.auth.getSession();
       const authHeaders = gameSession
@@ -911,7 +964,7 @@
         const teamRes = await fetch('/api/teams', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders },
-          body: JSON.stringify({ name: awayName, players: pendingAwayPlayers })
+          body: JSON.stringify({ name: awayName, players: awayLineupPlayers })
         });
         const teamData = await teamRes.json();
         if (teamRes.ok) finalAwayTeamId = teamData.id;
@@ -923,26 +976,26 @@
         const teamRes = await fetch('/api/teams', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...authHeaders },
-          body: JSON.stringify({ name: homeName, players: pendingHomePlayers })
+          body: JSON.stringify({ name: homeName, players: homeLineupPlayers })
         });
         const teamData = await teamRes.json();
         if (teamRes.ok) finalHomeTeamId = teamData.id;
       }
 
       // 4. Save lineups for the game
-      if (pendingAwayPlayers.length > 0) {
+      if (awayLineupPlayers.length > 0 || finalAwayTeamId) {
         await fetch(`/api/game/${gameId}/lineup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ side: 'away', team_id: finalAwayTeamId, players: pendingAwayPlayers })
+          body: JSON.stringify({ side: 'away', team_id: finalAwayTeamId, players: awayLineupPlayers })
         });
       }
 
-      if (pendingHomePlayers.length > 0) {
+      if (homeLineupPlayers.length > 0 || finalHomeTeamId) {
         await fetch(`/api/game/${gameId}/lineup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ side: 'home', team_id: finalHomeTeamId, players: pendingHomePlayers })
+          body: JSON.stringify({ side: 'home', team_id: finalHomeTeamId, players: homeLineupPlayers })
         });
       }
 
@@ -1058,7 +1111,6 @@
       showToast('This game is final. Start a new game to keep scoring.', 'error');
       return;
     }
-    const battingSideBeforePlay = gameState?.half === 'top' ? 'away' : 'home';
     const input = document.getElementById('play-input').value.trim();
     if (!input) return;
     if (input.toLowerCase().startsWith('/fix ')) {
@@ -1087,10 +1139,9 @@
       document.getElementById('play-input').value = '';
       updateUI();
 
-      // Advance batting order if play completed (not ball or strike)
-      const completedPA = !['ball', 'strike'].includes(data.play.play_type);
-      if (completedPA && lineupState) {
-        await advanceBatter(battingSideBeforePlay);
+      // Completed at-bats advance the lineup on the server in /api/game/:id/play.
+      if (lineupState) {
+        await loadLineup();
       }
 
       showToast('Play recorded ✓', 'success');
@@ -1198,15 +1249,21 @@
   }
 
   async function loadLineup() {
-    if (!gameId) return;
+    if (!gameId) {
+      console.warn('[loadLineup] No gameId');
+      return;
+    }
     try {
       const res = await fetch(`/api/game/${gameId}/lineup`);
       if (res.ok) {
         lineupState = await res.json();
+        console.log('[loadLineup] Loaded:', { away: lineupState.away?.current_batter?.name, home: lineupState.home?.current_batter?.name });
         updateLineupPanel();
+      } else {
+        console.error('[loadLineup] API returned:', res.status);
       }
     } catch (e) {
-      console.error('Failed to load lineup:', e);
+      console.error('[loadLineup] Network error:', e);
     }
   }
 
@@ -1216,7 +1273,13 @@
     const battingSide = gameState.half === 'top' ? 'away' : 'home';
     const lineup = lineupState[battingSide];
 
-    if (!lineup || !lineup.players || lineup.players.length === 0) {
+    if (!lineup) {
+      document.getElementById('lineup-panel').style.display = 'none';
+      return;
+    }
+
+    const effectivePlayersArray = lineup.effective_players || lineup.players || [];
+    if (!effectivePlayersArray.length) {
       document.getElementById('lineup-panel').style.display = 'none';
       return;
     }
@@ -1225,7 +1288,7 @@
     document.getElementById('lineup-half-label').textContent = gameState.half === 'top' ? 'Top' : 'Bottom';
     document.getElementById('lineup-inning-label').textContent = ordinalInning(gameState.inning, '').split(' ')[1];
 
-    const players = lineup.players.sort((a, b) => (a.batting_order || 0) - (b.batting_order || 0));
+    const players = effectivePlayersArray.sort((a, b) => (a.batting_order || 0) - (b.batting_order || 0));
     const currentIdx = lineup.current_batter_index % players.length;
     const currentBatter = players[currentIdx];
     const nextIdx = (currentIdx + 1) % players.length;
@@ -1261,11 +1324,24 @@
   }
 
   async function advanceBatter(side) {
-    if (!gameId || !lineupState) return;
+    if (!gameId || !lineupState) {
+      console.warn('[advanceBatter] Missing gameId or lineupState');
+      return;
+    }
     const lineup = lineupState[side];
-    if (!lineup) return;
+    if (!lineup) {
+      console.warn(`[advanceBatter] No lineup for side: ${side}`);
+      return;
+    }
 
-    const nextIdx = (lineup.current_batter_index + 1) % (lineup.players?.length || 9);
+    const effectivePlayersArray = lineup.effective_players || lineup.players || [];
+    if (!effectivePlayersArray.length) {
+      console.warn(`[advanceBatter] No players in lineup for ${side}`);
+      return;
+    }
+
+    const nextIdx = (lineup.current_batter_index + 1) % effectivePlayersArray.length;
+    console.log(`[advanceBatter] ${side}: advancing from index ${lineup.current_batter_index} to ${nextIdx}`);
 
     try {
       const res = await fetch(`/api/game/${gameId}/lineup`, {
@@ -1275,11 +1351,16 @@
       });
 
       if (res.ok) {
-        lineupState[side] = await res.json();
+        const updatedLineup = await res.json();
+        lineupState[side] = updatedLineup;
+        console.log(`[advanceBatter] Updated ${side} batter to:`, updatedLineup.current_batter?.name);
         updateLineupPanel();
+      } else {
+        const error = await res.json();
+        console.error(`[advanceBatter] Failed to advance: ${error.error}`);
       }
     } catch (e) {
-      console.error('Failed to advance batter:', e);
+      console.error('[advanceBatter] Network error:', e);
     }
   }
 

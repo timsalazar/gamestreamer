@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node --env-file=.env server.js",
     "dev": "nodemon --env-file=.env server.js",
+    "eval:plays": "node --env-file=.env scripts/claude-play-eval.js",
     "deploy": "vercel --prod",
     "build-vercel": "echo 'Vercel using api/ handlers'",
     "test": "node --experimental-test-module-mocks --test tests/*.test.js",

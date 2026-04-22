@@ -2,7 +2,7 @@
  * API handler tests — Supabase and Claude are fully mocked.
  * We import handlers directly and drive them with fake req/res objects.
  */
-import { test, describe, before, mock } from 'node:test';
+import { test, describe, before, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 
 // ── Mock Supabase ──────────────────────────────────────────────────────────
@@ -10,59 +10,107 @@ import assert from 'node:assert/strict';
 
 const mockGames = new Map();
 const mockPlays = [];
+const mockLineups = [];
+const mockTeams = [];
 
 function makeSupabaseClient() {
-  const chain = (data, error = null) => ({
-    data, error,
-    single:  () => ({ data: Array.isArray(data) ? data[0] ?? null : data, error }),
-    select:  () => chain(data, error),
-    insert:  () => chain(data, error),
-    update:  () => chain(data, error),
-    delete:  () => chain(data, error),
-    eq:      () => chain(data, error),
-    order:   () => chain(data, error),
-    limit:   () => chain(data, error),
-  });
+  function rowsFor(table) {
+    if (table === 'games') return [...mockGames.values()];
+    if (table === 'plays') return mockPlays;
+    if (table === 'game_lineups') return mockLineups;
+    if (table === 'teams') return mockTeams;
+    return [];
+  }
+
+  function buildSelect(table, filters = []) {
+    const applyFilters = () => rowsFor(table).filter((row) =>
+      filters.every(({ col, val }) => row?.[col] === val)
+    );
+
+    return {
+      eq: (col, val) => buildSelect(table, [...filters, { col, val }]),
+      single: () => {
+        const rows = applyFilters();
+        const data = rows[0] ?? null;
+        const error = data ? null : { message: 'not found', code: 'PGRST116' };
+        return { data, error };
+      },
+      order: () => ({
+        limit: () => ({ data: applyFilters(), error: null }),
+      }),
+      limit: () => ({ data: applyFilters(), error: null }),
+      then: undefined,
+      data: applyFilters(),
+    };
+  }
+
+  function buildUpdate(table, updates, filters = []) {
+    const applyUpdate = () => {
+      if (table === 'games') {
+        const idFilter = filters.find(({ col }) => col === 'id');
+        if (!idFilter || !mockGames.has(idFilter.val)) {
+          return { data: null, error: { message: 'not found' } };
+        }
+        const updated = { ...mockGames.get(idFilter.val), ...updates };
+        mockGames.set(idFilter.val, updated);
+        return { data: updated, error: null };
+      }
+
+      if (table === 'game_lineups') {
+        const index = mockLineups.findIndex((row) =>
+          filters.every(({ col, val }) => row?.[col] === val)
+        );
+        if (index === -1) {
+          return { data: null, error: { message: 'not found' } };
+        }
+        mockLineups[index] = { ...mockLineups[index], ...updates };
+        return { data: mockLineups[index], error: null };
+      }
+
+      return { data: null, error: { message: 'not found' } };
+    };
+
+    return {
+      eq: (col, val) => buildUpdate(table, updates, [...filters, { col, val }]),
+      select: () => ({
+        single: () => applyUpdate(),
+      }),
+      single: () => applyUpdate(),
+    };
+  }
 
   return {
     from: (table) => ({
-      select: (cols) => ({
-        eq: (col, val) => ({
-          single: () => {
-            if (table === 'games') {
-              const g = mockGames.get(val);
-              return { data: g ?? null, error: g ? null : { message: 'not found', code: 'PGRST116' } };
-            }
-            return { data: null, error: { message: 'not found' } };
-          },
-          order: () => ({ limit: () => ({ data: mockPlays.filter(p => p.game_id === val), error: null }) }),
-        }),
-        order: () => ({ limit: () => ({ data: [...mockGames.values()], error: null }) }),
-      }),
+      select: () => buildSelect(table),
       insert: (row) => ({
         select: () => ({
           single: () => {
             const newRow = { ...row, id: row.id ?? 'test-' + Date.now(), created_at: new Date().toISOString() };
             if (table === 'games') mockGames.set(newRow.id, newRow);
+            else if (table === 'game_lineups') mockLineups.push(newRow);
             else mockPlays.push(newRow);
             return { data: newRow, error: null };
           },
         }),
       }),
-      update: (updates) => ({
-        eq: (col, val) => ({
-          select: () => ({
-            single: () => {
-              if (table === 'games' && mockGames.has(val)) {
-                const updated = { ...mockGames.get(val), ...updates };
-                mockGames.set(val, updated);
-                return { data: updated, error: null };
-              }
-              return { data: null, error: { message: 'not found' } };
-            },
-          }),
+      upsert: (row) => ({
+        select: () => ({
+          single: () => {
+            if (table !== 'game_lineups') {
+              return { data: null, error: { message: 'unsupported upsert' } };
+            }
+
+            const index = mockLineups.findIndex((existing) =>
+              existing.game_id === row.game_id && existing.side === row.side
+            );
+            const nextRow = { ...row, id: row.id ?? mockLineups[index]?.id ?? 'test-' + Date.now() };
+            if (index >= 0) mockLineups[index] = nextRow;
+            else mockLineups.push(nextRow);
+            return { data: nextRow, error: null };
+          },
         }),
       }),
+      update: (updates) => buildUpdate(table, updates),
       delete: () => ({
         eq: (col, val) => ({ data: null, error: null }),
       }),
@@ -75,6 +123,7 @@ mock.module('../lib/supabase.js', {
   namedExports: {
     supabaseAdmin: makeSupabaseClient(),
     supabaseConfig: { url: 'http://test', anonKey: 'test' },
+    isMissingTableError: (error) => error?.code === '42P01',
   },
 });
 
@@ -163,7 +212,7 @@ function makeRes() {
 
 // ── Lazy-load handlers after mocks are set up ──────────────────────────────
 
-let gamesHandler, stateHandler, playHandler, countHandler, fixHandler;
+let gamesHandler, stateHandler, playHandler, countHandler, fixHandler, lineupHandler;
 
 before(async () => {
   ({ default: gamesHandler } = await import('../api/games.js'));
@@ -171,12 +220,19 @@ before(async () => {
   ({ default: playHandler  } = await import('../api/game/[id]/play.js'));
   ({ default: countHandler } = await import('../api/game/[id]/count.js'));
   ({ default: fixHandler } = await import('../api/game/[id]/fix.js'));
+  ({ default: lineupHandler } = await import('../api/game/[id]/lineup.js'));
 });
 
 function resetData() {
   mockGames.clear();
   mockPlays.length = 0;
+  mockLineups.length = 0;
+  mockTeams.length = 0;
 }
+
+beforeEach(() => {
+  resetData();
+});
 
 // ── Seed helper ────────────────────────────────────────────────────────────
 
@@ -225,11 +281,35 @@ describe('GET /api/game/:id/state', () => {
   test('returns game state for known game', async () => {
     resetData();
     seedGame('g-state-1');
+    mockPlays.push(
+      {
+        id: 'play-1',
+        game_id: 'g-state-1',
+        inning: 1,
+        half: 'top',
+        raw_input: 'single to left',
+        structured_play: { hit: true, error: false },
+        score_after: { away: 0, home: 0 },
+      },
+      {
+        id: 'play-2',
+        game_id: 'g-state-1',
+        inning: 1,
+        half: 'bottom',
+        raw_input: 'reached on error',
+        structured_play: { hit: false, error: true },
+        score_after: { away: 0, home: 0 },
+      }
+    );
     const req = makeReq('GET', { id: 'g-state-1' });
     const res = makeRes();
     await stateHandler(req, res);
     assert.equal(res._status, 200);
     assert.equal(res._body.id, 'g-state-1');
+    assert.equal(res._body.away_hits, 1);
+    assert.equal(res._body.home_hits, 0);
+    assert.equal(res._body.away_errors, 1);
+    assert.equal(res._body.home_errors, 0);
   });
 
   test('returns 404 for unknown game', async () => {
@@ -238,6 +318,26 @@ describe('GET /api/game/:id/state', () => {
     const res = makeRes();
     await stateHandler(req, res);
     assert.equal(res._status, 404);
+  });
+
+  test('derives hits from hit play types even when hit flag is missing', async () => {
+    resetData();
+    seedGame('g-state-2');
+    mockPlays.push({
+      id: 'play-3',
+      game_id: 'g-state-2',
+      inning: 1,
+      half: 'top',
+      raw_input: 'double to the gap',
+      structured_play: { play_type: 'double', error: false },
+      score_after: { away: 0, home: 0 },
+    });
+    const req = makeReq('GET', { id: 'g-state-2' });
+    const res = makeRes();
+    await stateHandler(req, res);
+    assert.equal(res._status, 200);
+    assert.equal(res._body.away_hits, 1);
+    assert.equal(res._body.home_hits, 0);
   });
 
 });
@@ -274,6 +374,59 @@ describe('PATCH /api/game/:id/state', () => {
     await stateHandler(req, res);
     assert.equal(res._status, 200);
     assert.equal(res._body.status, 'final');
+  });
+
+});
+
+describe('PATCH /api/game/:id/lineup', () => {
+
+  test('updates current_batter_index on the game_lineups row', async () => {
+    seedGame('g-lineup-1');
+    mockLineups.push({
+      id: 'lineup-1',
+      game_id: 'g-lineup-1',
+      side: 'away',
+      team_id: 'team-1',
+      players: [
+        { name: 'Alice', batting_order: 1 },
+        { name: 'Bea', batting_order: 2 },
+      ],
+      current_batter_index: 0,
+    });
+
+    const req = makeReq('PATCH', { id: 'g-lineup-1' }, { side: 'away', current_batter_index: 1 });
+    const res = makeRes();
+    await lineupHandler(req, res);
+
+    assert.equal(res._status, 200);
+    assert.equal(mockLineups[0].current_batter_index, 1);
+    assert.equal(res._body.current_batter?.name, 'Bea');
+    assert.equal(res._body.on_deck?.name, 'Alice');
+  });
+
+});
+
+describe('POST /api/game/:id/lineup', () => {
+
+  test('backfills players from selected team when client sends an empty lineup', async () => {
+    seedGame('g-lineup-2');
+    mockTeams.push({
+      id: 'team-2',
+      players: [
+        { name: 'Nia', batting_order: 1, position: 'SS' },
+        { name: 'Ola', batting_order: 2, position: 'P' },
+      ],
+    });
+
+    const req = makeReq('POST', { id: 'g-lineup-2' }, { side: 'away', team_id: 'team-2', players: [] });
+    const res = makeRes();
+    await lineupHandler(req, res);
+
+    assert.equal(res._status, 200);
+    assert.equal(mockLineups[0].players.length, 2);
+    assert.equal(mockLineups[0].players[0].name, 'Nia');
+    assert.equal(res._body.current_batter?.name, 'Nia');
+    assert.equal(res._body.on_deck?.name, 'Ola');
   });
 
 });

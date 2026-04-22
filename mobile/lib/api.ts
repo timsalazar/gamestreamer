@@ -15,6 +15,10 @@ export interface GameState {
   home_team: string;
   away_score: number;
   home_score: number;
+  away_hits?: number;
+  home_hits?: number;
+  away_errors?: number;
+  home_errors?: number;
   inning: number;
   half: 'top' | 'bottom';
   outs: number;
@@ -30,13 +34,48 @@ export interface GameState {
   };
 }
 
+export interface StructuredRunner {
+  name?: string | null;
+  from?: string | null;
+  to?: string | null;
+}
+
+export interface StructuredPlay {
+  play_type: string;
+  batter?: string;
+  pitcher?: string;
+  runs_scored?: number;
+  outs_recorded?: number;
+  unearned_runs?: number;
+  hit?: boolean;
+  error?: boolean;
+  runners?: StructuredRunner[];
+}
+
 export interface Play {
   id: string;
   raw_input: string;
   inning: number;
   half: string;
-  structured_play?: { play_type: string };
+  structured_play?: StructuredPlay;
   score_after?: { away: number; home: number };
+}
+
+export interface LineupPlayer {
+  batting_order?: number;
+  name?: string;
+  position?: string;
+  number?: string | null;
+}
+
+export interface TeamLineup {
+  effective_players?: LineupPlayer[];
+  current_batter?: LineupPlayer | null;
+}
+
+export interface GameLineups {
+  away: TeamLineup | null;
+  home: TeamLineup | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -87,6 +126,9 @@ export const api = {
 
   getPlays: (gameId: string) =>
     request<Play[]>(`/api/game/${encodeURIComponent(gameId)}/plays`),
+
+  getLineup: (gameId: string) =>
+    request<GameLineups>(`/api/game/${encodeURIComponent(gameId)}/lineup`),
 
   updateStreamUrl: (gameId: string, stream_url: string) =>
     request<GameState>(
