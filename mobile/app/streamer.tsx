@@ -8,8 +8,8 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { api } from '../lib/api';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { api, MuxLiveSession } from '../lib/api';
 import { C } from '../lib/colors';
 
 interface Platform {
@@ -65,9 +65,12 @@ const PLATFORMS: Platform[] = [
 
 export default function StreamerScreen() {
   const params = useLocalSearchParams<{ game?: string }>();
+  const router = useRouter();
   const [gameId, setGameId] = useState(params.game ?? '');
   const [streamUrl, setStreamUrl] = useState('');
   const [saving, setSaving] = useState(false);
+  const [creatingMux, setCreatingMux] = useState(false);
+  const [muxSession, setMuxSession] = useState<MuxLiveSession | null>(null);
   const [msg, setMsg] = useState<{ type: 'ok' | 'error'; text: string } | null>(null);
 
   async function saveStream() {
@@ -89,6 +92,39 @@ export default function StreamerScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function createMuxSession() {
+    if (!gameId.trim()) {
+      setMsg({ type: 'error', text: 'Enter a game ID.' });
+      return;
+    }
+
+    setCreatingMux(true);
+    setMsg(null);
+    try {
+      const session = await api.createMuxLiveSession(gameId.trim());
+      setMuxSession(session);
+      setStreamUrl(session.mux.playback_url);
+      setMsg({ type: 'ok', text: 'Mux live session created and saved to the game.' });
+    } catch (e) {
+      setMsg({ type: 'error', text: (e as Error).message });
+    } finally {
+      setCreatingMux(false);
+    }
+  }
+
+  function openMuxCamera() {
+    if (!muxSession) return;
+    router.push({
+      pathname: '/mux-camera',
+      params: {
+        game: gameId.trim(),
+        rtmpUrl: muxSession.mux.rtmp_url,
+        streamKey: muxSession.mux.stream_key,
+        playbackUrl: muxSession.mux.playback_url,
+      },
+    });
   }
 
   return (
@@ -155,6 +191,35 @@ export default function StreamerScreen() {
               {msg.text}
             </Text>
           </View>
+        ) : null}
+      </View>
+
+      <View style={s.card}>
+        <Text style={s.cardTitle}>Mux native camera</Text>
+        <Text style={s.cardDesc}>
+          Create a Mux live session for this game, save the playback URL, then
+          open the native broadcaster scaffold with the RTMP ingest settings.
+        </Text>
+        <TouchableOpacity
+          style={[s.muxBtn, creatingMux && s.saveBtnDisabled]}
+          onPress={createMuxSession}
+          disabled={creatingMux}
+          activeOpacity={0.8}
+        >
+          {creatingMux ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={s.saveBtnText}>Create Mux Live Session</Text>
+          )}
+        </TouchableOpacity>
+        {muxSession ? (
+          <TouchableOpacity
+            style={s.openCameraBtn}
+            onPress={openMuxCamera}
+            activeOpacity={0.8}
+          >
+            <Text style={s.openCameraBtnText}>Open Native Camera</Text>
+          </TouchableOpacity>
         ) : null}
       </View>
 
@@ -241,6 +306,21 @@ const s = StyleSheet.create({
     padding: 14,
     alignItems: 'center',
   },
+  muxBtn: {
+    backgroundColor: C.blue,
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+  },
+  openCameraBtn: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: C.blueLight,
+    borderRadius: 10,
+    padding: 14,
+    alignItems: 'center',
+  },
+  openCameraBtnText: { color: C.blueLight, fontSize: 15, fontWeight: '700' },
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText: { color: 'white', fontSize: 15, fontWeight: '700' },
   msgBox: {

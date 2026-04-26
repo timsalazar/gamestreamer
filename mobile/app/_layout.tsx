@@ -42,6 +42,7 @@ export default function RootLayout() {
         <Stack.Screen name="scorer" options={{ title: 'Scorer' }} />
         <Stack.Screen name="viewer" options={{ title: 'Watch Game' }} />
         <Stack.Screen name="streamer" options={{ title: 'Streamer Setup' }} />
+        <Stack.Screen name="mux-camera" options={{ title: 'Mux Camera' }} />
         <Stack.Screen name="boxscore" options={{ title: 'Box Score' }} />
         <Stack.Screen
           name="teams"

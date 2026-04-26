@@ -39,6 +39,19 @@ export interface Play {
   score_after?: { away: number; home: number };
 }
 
+export interface MuxLiveSession {
+  game: GameState;
+  mux: {
+    live_stream_id: string;
+    stream_key: string;
+    playback_id: string;
+    playback_url: string;
+    rtmp_url: string;
+    rtmps_url: string;
+    latency_mode: string;
+  };
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -92,6 +105,12 @@ export const api = {
     request<GameState>(
       `/api/game/${encodeURIComponent(gameId)}/state`,
       { method: 'PATCH', body: JSON.stringify({ stream_url }) }
+    ),
+
+  createMuxLiveSession: (gameId: string) =>
+    request<MuxLiveSession>(
+      `/api/game/${encodeURIComponent(gameId)}/mux-live`,
+      { method: 'POST', body: JSON.stringify({ latency_mode: 'low' }) }
     ),
 };
 

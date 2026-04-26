@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../../../lib/supabase.js';
 import { parsePlay } from '../../../lib/claude.js';
-import { applyPlay, validatePlay } from '../../../lib/game-logic.js';
+import { applyCommand, applyPlay, validatePlay } from '../../../lib/game-logic.js';
+import { parseScoringCommand } from '../../../lib/scoring-parser.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -27,17 +28,90 @@ export default async function handler(req, res) {
     if (gameErr || !game) return res.status(404).json({ error: 'Game not found' });
     if (game.status === 'final') return res.status(400).json({ error: 'Game is already final' });
 
-    // 2. Call Claude to parse the play
     let structuredPlay;
+    let newState;
+    const command = parseScoringCommand(raw_input, game);
+
+    if (command?.needs_clarification) {
+      return res.status(409).json({
+        error: 'Clarification needed',
+        question: command.clarification_question ?? 'Please clarify that scoring input.',
+        scoring_command: command,
+      });
+    }
+
+    if (command && !command.needs_clarification) {
+      const result = applyCommand(game, command);
+      if (!result.valid) {
+        return res.status(422).json({
+          error: `Play validation failed: ${result.reason}`,
+          scoring_command: command,
+          structured_play: result.play,
+        });
+      }
+      structuredPlay = result.play;
+      newState = result.state;
+    }
+
+    // 2. Fall back to Claude when the deterministic parser has low confidence.
     try {
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Claude API timeout')), 25000)
-      );
-      structuredPlay = await Promise.race([parsePlay(raw_input, game), timeoutPromise]);
+      if (!structuredPlay) {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Claude API timeout')), 25000)
+        );
+        structuredPlay = await Promise.race([parsePlay(raw_input, game), timeoutPromise]);
+      }
     } catch (err) {
       return res.status(503).json({
         error: 'Could not parse that play. Try rephrasing.',
         detail: err.message,
+      });
+    }
+
+    if (newState) {
+      const loggedPlay = {
+        ...structuredPlay,
+        count_after: { balls: newState.balls, strikes: newState.strikes },
+      };
+
+      const { data: insertedPlay, error: playErr } = await supabaseAdmin.from('plays')
+        .insert({
+          game_id: id,
+          inning: game.inning,
+          half: game.half,
+          raw_input: raw_input.trim(),
+          structured_play: loggedPlay,
+          score_after: { home: newState.home_score, away: newState.away_score },
+        })
+        .select()
+        .single();
+
+      if (playErr) return res.status(500).json({ error: playErr.message });
+
+      const { data: updatedGame, error: updateErr } = await supabaseAdmin
+        .from('games')
+        .update({
+          inning: newState.inning,
+          half: newState.half,
+          outs: newState.outs,
+          home_score: newState.home_score,
+          away_score: newState.away_score,
+          balls: newState.balls,
+          strikes: newState.strikes,
+          runners: newState.runners,
+          inning_scores: newState.inning_scores,
+          status: 'live',
+        })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateErr) return res.status(500).json({ error: updateErr.message });
+
+      return res.status(200).json({
+        game: updatedGame,
+        play: loggedPlay,
+        recent_play: insertedPlay,
       });
     }
 
@@ -86,7 +160,7 @@ export default async function handler(req, res) {
     }
 
     // 4. Apply play to game state
-    const newState = applyPlay(game, structuredPlay);
+    newState = applyPlay(game, structuredPlay);
     const loggedPlay = {
       ...structuredPlay,
       count_after: { balls: newState.balls, strikes: newState.strikes },

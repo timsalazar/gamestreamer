@@ -144,6 +144,21 @@ mock.module('../lib/claude.js', {
   },
 });
 
+// ── Mock Mux ───────────────────────────────────────────────────────────────
+mock.module('../lib/mux.js', {
+  namedExports: {
+    createMuxLiveStream: async ({ gameId }) => ({
+      live_stream_id: `mux-${gameId}`,
+      stream_key: 'test-stream-key',
+      playback_id: 'test-playback-id',
+      playback_url: 'https://stream.mux.com/test-playback-id.m3u8',
+      rtmp_url: 'rtmp://global-live.mux.com:5222/app',
+      rtmps_url: 'rtmps://global-live.mux.com:443/app',
+      latency_mode: 'low',
+    }),
+  },
+});
+
 // ── Fake req/res ───────────────────────────────────────────────────────────
 
 function makeReq(method, params = {}, body = {}, query = {}) {
@@ -163,7 +178,7 @@ function makeRes() {
 
 // ── Lazy-load handlers after mocks are set up ──────────────────────────────
 
-let gamesHandler, stateHandler, playHandler, countHandler, fixHandler;
+let gamesHandler, stateHandler, playHandler, countHandler, fixHandler, muxLiveHandler;
 
 before(async () => {
   ({ default: gamesHandler } = await import('../api/games.js'));
@@ -171,6 +186,7 @@ before(async () => {
   ({ default: playHandler  } = await import('../api/game/[id]/play.js'));
   ({ default: countHandler } = await import('../api/game/[id]/count.js'));
   ({ default: fixHandler } = await import('../api/game/[id]/fix.js'));
+  ({ default: muxLiveHandler } = await import('../api/game/[id]/mux-live.js'));
 });
 
 function resetData() {
@@ -278,6 +294,32 @@ describe('PATCH /api/game/:id/state', () => {
 
 });
 
+// ── Tests: POST /api/game/:id/mux-live ────────────────────────────────────
+
+describe('POST /api/game/:id/mux-live', () => {
+
+  test('creates a Mux live session and saves playback URL', async () => {
+    resetData();
+    seedGame('g-mux-1');
+    const req = makeReq('POST', { id: 'g-mux-1' }, {});
+    const res = makeRes();
+    await muxLiveHandler(req, res);
+    assert.equal(res._status, 201);
+    assert.equal(res._body.mux.stream_key, 'test-stream-key');
+    assert.equal(res._body.game.stream_url, 'https://stream.mux.com/test-playback-id.m3u8');
+    assert.equal(mockGames.get('g-mux-1').stream_url, 'https://stream.mux.com/test-playback-id.m3u8');
+  });
+
+  test('returns 404 for unknown game', async () => {
+    resetData();
+    const req = makeReq('POST', { id: 'does-not-exist' }, {});
+    const res = makeRes();
+    await muxLiveHandler(req, res);
+    assert.equal(res._status, 404);
+  });
+
+});
+
 // ── Tests: POST /api/game/:id/play ────────────────────────────────────────
 
 describe('POST /api/game/:id/play', () => {
@@ -362,6 +404,20 @@ describe('POST /api/game/:id/play', () => {
     assert.equal(res._body.recent_play.structured_play.play_type, 'ball');
     assert.deepEqual(res._body.recent_play.structured_play.count_after, { balls: 1, strikes: 0 });
     assert.equal(mockPlays.at(-1).game_id, 'g-play-7');
+  });
+
+  test('returns clarification for ambiguous deterministic input', async () => {
+    resetData();
+    seedGame('g-play-8', {
+      runners: { first: 'Alex', second: 'Blake', third: null },
+    });
+    const req = makeReq('POST', { id: 'g-play-8' }, { raw_input: 'runner scored' });
+    const res = makeRes();
+    await playHandler(req, res);
+    assert.equal(res._status, 409);
+    assert.equal(res._body.error, 'Clarification needed');
+    assert.match(res._body.question, /Which runner scored/);
+    assert.equal(mockPlays.length, 0);
   });
 
 });

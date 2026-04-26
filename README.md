@@ -60,6 +60,10 @@ vercel env add SUPABASE_SERVICE_KEY
 vercel env add ANTHROPIC_API_KEY
 # → sk-ant-...
 
+vercel env add MUX_TOKEN_ID
+vercel env add MUX_TOKEN_SECRET
+# → create these in the Mux dashboard under Settings → Access Tokens
+
 # Deploy to production
 vercel --prod
 ```
@@ -86,6 +90,14 @@ Share link: `https://your-app.vercel.app/viewer.html?game=GAMEID`
 3. In Larix: add connection → `rtmp://a.rtmp.youtube.com/live2` + stream key
 4. Start streaming
 5. In scorer UI: paste the YouTube watch URL as the stream URL
+
+### Streaming (Mux Live)
+1. Add `MUX_TOKEN_ID` and `MUX_TOKEN_SECRET` to Vercel.
+2. In the mobile Streamer screen, enter a Game ID and tap **Create Mux Live Session**.
+3. GameStreamer creates a Mux live stream and saves its playback URL to the game.
+4. Open **Native Camera** to pass Mux RTMP settings into the native broadcaster scaffold.
+
+Mux accepts RTMP/RTMPS ingest. Expo Go does not include a native RTMP encoder, so the scaffold intentionally stops at `mobile/lib/nativeBroadcaster.ts` until an iOS/Android encoder module is added through a custom dev client or bare React Native build.
 
 ---
 

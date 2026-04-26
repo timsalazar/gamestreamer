@@ -15,7 +15,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.gamestreamer.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Used for live streaming"
+        "NSCameraUsageDescription": "Used for live streaming",
+        "NSMicrophoneUsageDescription": "Used to capture game audio for live streaming"
       }
     },
     "android": {
